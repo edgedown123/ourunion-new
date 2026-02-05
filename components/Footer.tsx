@@ -17,38 +17,19 @@ export default function Footer({
 }: FooterProps) {
   const [open, setOpen] = useState<null | "privacy" | "email">(null);
 
-  
-const getLinkImageSrc = (label: string) => {
-  // NOTE: We use an inline SVG (data URI) so the UI never breaks due to missing static image files.
-  const safeLabel = label || '링크';
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="100%" stop-color="#f5f7fb"/>
-    </linearGradient>
-    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.10"/>
-    </filter>
-  </defs>
-  <rect x="0" y="0" width="640" height="360" rx="28" fill="url(#g)"/>
-  <g filter="url(#s)">
-    <rect x="44" y="64" width="552" height="232" rx="26" fill="#ffffff"/>
-  </g>
-  <!-- YouTube-like play badge -->
-  <g transform="translate(96,138)">
-    <rect x="0" y="0" width="108" height="84" rx="18" fill="#ff0000"/>
-    <polygon points="44,20 44,64 80,42" fill="#ffffff"/>
-  </g>
-  <text x="232" y="190" font-family="Arial, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
-        font-size="44" font-weight="700" fill="#111827">${safeLabel}</text>
-  <text x="232" y="236" font-family="Arial, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"
-        font-size="24" font-weight="500" fill="#6b7280">바로가기</text>
-</svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-};
-
+  const getLinkImageSrc = (label: string) => {
+    const key = label.replace(/\s+/g, '');
+    switch (key) {
+      case '겸손은힘들다':
+        return '/images/youtube-겸손은힘들다.png';
+      case '김동걸TV':
+        return '/images/youtube-김동걸TV.png';
+      case '한국brt축구단':
+        return '/images/youtube-한국brt축구단.png';
+      default:
+        return null;
+    }
+  };
 
   const privacyText = useMemo(
     () => `우리노동조합(이하 “조합”)은 개인정보 보호법 등 관련 법령을 준수하며,
@@ -167,7 +148,7 @@ const getLinkImageSrc = (label: string) => {
           >
             <div className="w-full h-[60px] sm:h-[64px] md:h-[72px] rounded-2xl shadow-md overflow-hidden bg-white hover:brightness-95 transition-all">
               <img
-                src={getLinkImageSrc("회원 탈퇴")}
+                src="/images/youtube-회원탈퇴.png"
                 alt="회원 탈퇴"
                 className="w-full h-full object-contain"
               />
@@ -185,7 +166,7 @@ const getLinkImageSrc = (label: string) => {
       >
         <div className="w-full h-[60px] sm:h-[64px] md:h-[72px] rounded-2xl shadow-md overflow-hidden bg-white hover:brightness-95 transition-all">
           <img
-            src={getLinkImageSrc("회원 탈퇴")}
+            src="/images/youtube-회원탈퇴.png"
             alt="회원 탈퇴"
             className="w-full h-full object-contain"
           />
