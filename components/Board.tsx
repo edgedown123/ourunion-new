@@ -572,7 +572,7 @@ const renderContentWithInlineImages = (raw: string) => {
         </div>
         {userRole !== 'guest' && (userRole === 'admin' || type === 'free') && type !== 'notice' && (
           <button 
-            onClick={() => onWriteClick()} 
+            onClick={() => onWriteClick(type)} 
             className="bg-sky-primary text-white px-4 py-2 md:px-8 md:py-4 rounded-xl md:rounded-[1.5rem] font-black text-xs md:text-base shadow-xl shadow-sky-100 hover:opacity-90 active:scale-95 transition-all"
           >
             <i className="fas fa-pen-nib mr-1.5 md:mr-2"></i> 글쓰기

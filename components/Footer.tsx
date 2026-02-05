@@ -21,11 +21,11 @@ export default function Footer({
     const key = label.replace(/\s+/g, '');
     switch (key) {
       case '겸손은힘들다':
-        return '/images/youtube-겸손은힘들다.png';
+        return '/images/youtube-gyeomson.png';
       case '김동걸TV':
-        return '/images/youtube-김동걸TV.png';
+        return '/images/youtube-kimdonggeoltv.png';
       case '한국brt축구단':
-        return '/images/youtube-한국brt축구단.png';
+        return '/images/youtube-koreabrt.png';
       default:
         return null;
     }
@@ -148,7 +148,7 @@ export default function Footer({
           >
             <div className="w-full h-[60px] sm:h-[64px] md:h-[72px] rounded-2xl shadow-md overflow-hidden bg-white hover:brightness-95 transition-all">
               <img
-                src="/images/youtube-회원탈퇴.png"
+                src="/images/youtube-withdraw.png"
                 alt="회원 탈퇴"
                 className="w-full h-full object-contain"
               />
@@ -166,7 +166,7 @@ export default function Footer({
       >
         <div className="w-full h-[60px] sm:h-[64px] md:h-[72px] rounded-2xl shadow-md overflow-hidden bg-white hover:brightness-95 transition-all">
           <img
-            src="/images/youtube-회원탈퇴.png"
+            src="/images/youtube-withdraw.png"
             alt="회원 탈퇴"
             className="w-full h-full object-contain"
           />
