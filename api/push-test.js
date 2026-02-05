@@ -1,68 +1,76 @@
-// Vercel Serverless Function
-// URL: /api/push-test?secret=...&msg=...
+// api/push-test.js
+import webpush from "web-push";
+import { createClient } from "@supabase/supabase-js";
 
-const webpush = require("web-push");
-const { createClient } = require("@supabase/supabase-js");
-
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
-    const secret = req.query.secret;
-    if (!process.env.PUSH_TEST_SECRET || secret !== process.env.PUSH_TEST_SECRET) {
-      return res.status(401).json({ ok: false, error: "unauthorized" });
+    const { secret, msg } = req.query;
+
+    if (!process.env.PUSH_TEST_SECRET) {
+      return res.status(500).json({ ok: false, error: "Missing PUSH_TEST_SECRET" });
+    }
+    if (secret !== process.env.PUSH_TEST_SECRET) {
+      return res.status(401).json({ ok: false, error: "Invalid secret" });
     }
 
-    const message = req.query.msg || "테스트 푸시입니다 ✅";
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
+    const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
+    const VAPID_SUBJECT = process.env.VAPID_SUBJECT;
 
-    webpush.setVapidDetails(
-      process.env.VAPID_SUBJECT,
-      process.env.VAPID_PUBLIC_KEY,
-      process.env.VAPID_PRIVATE_KEY
-    );
+    for (const [k, v] of Object.entries({
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+      VAPID_PUBLIC_KEY,
+      VAPID_PRIVATE_KEY,
+      VAPID_SUBJECT,
+    })) {
+      if (!v) return res.status(500).json({ ok: false, error: `Missing env: ${k}` });
+    }
 
-    const supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
 
-    const { data: subs, error } = await supabase
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
+    });
+
+    const { data, error } = await supabase
       .from("push_subscriptions")
-      .select("id, endpoint, p256dh, auth")
-      .order("id", { ascending: true });
+      .select("endpoint,p256dh,auth,user_id")
+      .order("id", { ascending: false })
+      .limit(50);
 
-    if (error) throw error;
-    if (!subs || subs.length === 0) {
-      return res.status(200).json({ ok: false, error: "no subscriptions" });
-    }
+    if (error) return res.status(500).json({ ok: false, error: error.message });
 
     const payload = JSON.stringify({
-      title: "우리노동조합",
-      body: message,
-      url: "/#tab=board",
+      title: "서버 푸시 테스트",
+      body: msg || "✅ 서버에서 푸시 발송 성공!",
+      url: "/",
     });
 
     const results = [];
-    for (const s of subs) {
+    for (const row of data || []) {
+      const subscription = {
+        endpoint: row.endpoint,
+        keys: { p256dh: row.p256dh, auth: row.auth },
+      };
+
       try {
-        await webpush.sendNotification(
-          {
-            endpoint: s.endpoint,
-            keys: { p256dh: s.p256dh, auth: s.auth },
-          },
-          payload
-        );
-        results.push({ id: s.id, ok: true });
+        await webpush.sendNotification(subscription, payload);
+        results.push({ endpoint: row.endpoint, ok: true });
       } catch (e) {
-        results.push({
-          id: s.id,
-          ok: false,
-          statusCode: e?.statusCode,
-          message: e?.message,
-        });
+        results.push({ endpoint: row.endpoint, ok: false, error: String(e?.message || e) });
       }
     }
 
-    return res.status(200).json({ ok: true, count: subs.length, results });
+    return res.status(200).json({
+      ok: true,
+      sent: results.filter(r => r.ok).length,
+      failed: results.filter(r => !r.ok).length,
+      results,
+    });
   } catch (e) {
     return res.status(500).json({ ok: false, error: String(e?.message || e) });
   }
-};
+}
