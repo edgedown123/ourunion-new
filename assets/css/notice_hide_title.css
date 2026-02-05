@@ -1,0 +1,5 @@
+/* (옵션) 공지사항 영역 타이틀/서브타이틀을 CSS로 숨기고 싶을 때 사용 */
+.notice-hide-title .page-title,
+.notice-hide-title .page-sub-title {
+  display: none !important;
+}

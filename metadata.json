@@ -1,0 +1,7 @@
+{
+  "name": "우리노동조합 (Our Labor Union)",
+  "description": "노동자의 권익 보호와 소통을 위한 현대적이고 직관적인 노동조합 공식 웹사이트입니다.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
