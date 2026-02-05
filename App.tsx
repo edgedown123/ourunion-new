@@ -275,6 +275,14 @@ const App: React.FC = () => {
     localStorage.setItem(`union_${key}`, JSON.stringify(data));
   };
 
+const invalidateMembersCache = () => {
+  try {
+    localStorage.removeItem('union_members');
+    localStorage.setItem('union_members_dirty_at', String(Date.now()));
+  } catch {}
+};
+
+
   const handleTabChange = (tab: string) => {
     // 탭 그대로 이동
     // - 모바일: notice는 공지사항 랜딩(하위메뉴만 노출)
@@ -1185,5 +1193,25 @@ const handleRequestWithdraw = () => {
     </Layout>
   );
 };
+
+
+
+useEffect(() => {
+  if (!cloud.isSupabaseEnabled()) return;
+
+  const refresh = () => syncData(false);
+
+  window.addEventListener('focus', refresh);
+  const onVisibility = () => {
+    if (!document.hidden) refresh();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+
+  return () => {
+    window.removeEventListener('focus', refresh);
+    document.removeEventListener('visibilitychange', onVisibility);
+  };
+}, [syncData]);
+
 
 export default App;
