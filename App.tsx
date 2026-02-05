@@ -808,6 +808,24 @@ const handleRequestWithdraw = () => {
     window.scrollTo(0, 0);
   };
 
+
+  useEffect(() => {
+    if (!cloud.isSupabaseEnabled()) return;
+  
+    const refresh = () => syncData(false);
+  
+    window.addEventListener('focus', refresh);
+    const onVisibility = () => {
+      if (!document.hidden) refresh();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+  
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [syncData]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white">
@@ -816,23 +834,6 @@ const handleRequestWithdraw = () => {
       </div>
     );
   }
-
-useEffect(() => {
-  if (!cloud.isSupabaseEnabled()) return;
-
-  const refresh = () => syncData(false);
-
-  window.addEventListener('focus', refresh);
-  const onVisibility = () => {
-    if (!document.hidden) refresh();
-  };
-  document.addEventListener('visibilitychange', onVisibility);
-
-  return () => {
-    window.removeEventListener('focus', refresh);
-    document.removeEventListener('visibilitychange', onVisibility);
-  };
-}, [syncData]);
 
   return (
     <Layout settings={settings}>
