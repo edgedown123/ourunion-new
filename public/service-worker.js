@@ -1,5 +1,5 @@
-/* ourunion service worker - cache bust build 20260205130957 */
-const CACHE_NAME = 'ourunion-cache-20260205130957';
+/* ourunion service worker - cache bust build 20260206121000 */
+const CACHE_NAME = 'ourunion-cache-20260206121000';
 const CORE_ASSETS = [
   '/',           // index.html (navigation fallback)
   '/manifest.json',
@@ -25,6 +25,12 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   const url = new URL(req.url);
+
+  // ✅ Supabase 등 외부 도메인(cross-origin) 요청은 캐시하지 않음
+  //    (모바일에서 오래된 REST 응답이 계속 보여서 최신 글이 안 뜨는 문제 방지)
+  if (url.origin !== self.location.origin) {
+    return; // 네트워크로 그대로 통과
+  }
 
   // Never cache API or non-GET
   if (req.method !== 'GET' || url.pathname.startsWith('/api/')) {

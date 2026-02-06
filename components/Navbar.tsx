@@ -30,11 +30,11 @@ const Navbar: React.FC<NavbarProps> = ({ siteName, activeTab, onTabChange, userR
     const key = label.replace(/\s+/g, '');
     switch (key) {
       case '겸손은힘들다':
-        return '/images/youtube-겸손은힘들다.png';
+        return '/images/youtube-gyeomson.png';
       case '김동걸TV':
-        return '/images/youtube-김동걸TV.png';
+        return '/images/youtube-kimdonggeoltv.png';
       case '한국brt축구단':
-        return '/images/youtube-한국brt축구단.png';
+        return '/images/youtube-koreabrt.png';
       default:
         return null;
     }
