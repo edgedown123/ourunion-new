@@ -70,7 +70,7 @@ export async function requestNotificationPermission() {
   return await Notification.requestPermission();
 }
 
-export async function ensurePushSubscribed(opts?: { silent?: boolean }) {
+export async function ensurePushSubscribed(opts?: { silent?: boolean; requireAuth?: boolean }) {
   if (!isPushSupported()) throw new Error('이 브라우저는 푸시 알림을 지원하지 않습니다.');
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
   if (!VAPID_PUBLIC_KEY) throw new Error('VAPID 공개키(VITE_VAPID_PUBLIC_KEY)가 설정되지 않았습니다.');
@@ -104,7 +104,13 @@ export async function ensurePushSubscribed(opts?: { silent?: boolean }) {
     }));
 
   const accessToken = await getAccessTokenWithRetry(5000, 250);
-// accessToken이 없더라도(세션 준비 지연/비로그인) 익명으로 저장을 시도합니다.
+
+  // 조합원(로그인) 전용 흐름에서 강제하고 싶을 때
+  if (opts?.requireAuth && !accessToken) {
+    throw new Error('로그인 상태를 확인할 수 없어 알림 설정을 진행할 수 없습니다. 새로고침 후 다시 시도해주세요.');
+  }
+
+  // accessToken이 없더라도(세션 준비 지연/비로그인) 익명으로 저장을 시도합니다.
   const json = sub.toJSON();
   const endpoint = sub.endpoint;
   const p256dh = (json.keys as any)?.p256dh ?? null;

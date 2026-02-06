@@ -5,6 +5,7 @@ import { INITIAL_POSTS, INITIAL_SETTINGS } from './constants';
 import Layout from './components/Layout';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import PushOnboardingCard from './components/PushOnboardingCard';
 import Board from './components/Board';
 import NoticeLanding from './components/NoticeLanding';
 import NoticeSingle from './components/NoticeSingle';
@@ -135,6 +136,70 @@ const App: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [deletedPosts, setDeletedPosts] = useState<Post[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
+
+  // -----------------------------
+  // 조합원 홈 온보딩(푸시 알림 받기)
+  // - 승인 완료 + 로그인한 조합원에게만 노출
+  // - "나중에"를 누르면 1일 후 다시 노출
+  // - "알림 받기" 성공 시 영구적으로 숨김
+  // -----------------------------
+  const [showPushOnboarding, setShowPushOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 홈 화면 + 로그인 조합원만
+    if (activeTab !== 'home') {
+      setShowPushOnboarding(false);
+      return;
+    }
+    if (userRole !== 'member' || !loggedInMember?.id) {
+      setShowPushOnboarding(false);
+      return;
+    }
+
+    // 승인 완료 여부(세션 복원 로직상 member는 승인 완료지만, 안전하게 한 번 더 체크)
+    if (loggedInMember?.isApproved === false) {
+      setShowPushOnboarding(false);
+      return;
+    }
+
+    const memberId = loggedInMember.id;
+    const doneKey = `union_push_onboard_done_${memberId}`;
+    const dismissKey = `union_push_onboard_dismiss_${memberId}`;
+
+    const done = localStorage.getItem(doneKey) === '1';
+    if (done) {
+      setShowPushOnboarding(false);
+      return;
+    }
+
+    const dismissTs = Number(localStorage.getItem(dismissKey) || '0');
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    if (dismissTs && Date.now() - dismissTs < DAY_MS) {
+      setShowPushOnboarding(false);
+      return;
+    }
+
+    setShowPushOnboarding(true);
+  }, [activeTab, userRole, loggedInMember?.id, loggedInMember?.isApproved]);
+
+  const markPushOnboardingDone = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!loggedInMember?.id) return;
+    const memberId = loggedInMember.id;
+    localStorage.setItem(`union_push_onboard_done_${memberId}`, '1');
+    localStorage.removeItem(`union_push_onboard_dismiss_${memberId}`);
+    setShowPushOnboarding(false);
+  }, [loggedInMember?.id]);
+
+  const dismissPushOnboardingForOneDay = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    if (!loggedInMember?.id) return;
+    const memberId = loggedInMember.id;
+    localStorage.setItem(`union_push_onboard_dismiss_${memberId}`, String(Date.now()));
+    setShowPushOnboarding(false);
+  }, [loggedInMember?.id]);
 
 
   // -----------------------------
@@ -880,7 +945,21 @@ const handleRequestWithdraw = () => {
             </div>
           )
         ) : activeTab === 'home' ? (
-          <Hero title={settings.heroTitle} subtitle={settings.heroSubtitle} imageUrls={settings.heroImageUrls || [settings.heroImageUrl]} onJoinClick={() => handleTabChange('signup')} />
+          <>
+            {showPushOnboarding && (
+              <PushOnboardingCard
+                memberName={loggedInMember?.name}
+                onDone={markPushOnboardingDone}
+                onLater={dismissPushOnboardingForOneDay}
+              />
+            )}
+            <Hero
+              title={settings.heroTitle}
+              subtitle={settings.heroSubtitle}
+              imageUrls={settings.heroImageUrls || [settings.heroImageUrl]}
+              onJoinClick={() => handleTabChange('signup')}
+            />
+          </>
         ) : ['intro', 'greeting', 'history', 'map'].includes(activeTab) ? (
           <Introduction settings={settings} activeTab={activeTab} />
         ) : activeTab === 'signup' ? (
