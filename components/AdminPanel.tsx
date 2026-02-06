@@ -38,6 +38,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [openPostActionId, setOpenPostActionId] = useState<string | null>(null);
   const [activeOfficeId, setActiveOfficeId] = useState<string | null>(settings.offices[0]?.id || null);
 
+  // 푸시 디버그
+  const [pushDebug, setPushDebug] = useState<any>(null);
+  const [pushDbStatus, setPushDbStatus] = useState<any>(null);
+  const [pushDebugLoading, setPushDebugLoading] = useState(false);
+
   const [newYear, setNewYear] = useState('');
   const [newMonth, setNewMonth] = useState('');
   const [newDay, setNewDay] = useState('');
@@ -910,65 +915,73 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 className="px-5 py-3 rounded-full bg-slate-900 text-white font-bold hover:bg-slate-800 transition"
                 onClick={async () => {
                   try {
-                    // ✅ 반드시 '사용자 클릭' 이벤트 안에서 호출되어야 권한 팝업이 뜹니다.
                     if (!('Notification' in window)) {
                       alert('이 브라우저는 알림을 지원하지 않습니다.');
                       return;
                     }
-
-                    // ✅ 서비스워커가 없으면 먼저 등록/대기
-                    if ('serviceWorker' in navigator) {
-                      try {
-                        await navigator.serviceWorker.register('/service-worker.js');
-                        await navigator.serviceWorker.ready;
-                      } catch (e) {
-                        console.error('서비스워커 등록 실패', e);
-                      }
+                    // 권한 요청 + 서비스워커 등록 + 웹푸시 구독 + DB 저장까지 한 번에
+                    const { enableNotifications } = await import('../pwa');
+                    const ok = await enableNotifications();
+                    if (!ok) {
+                      alert('알림을 켜지 못했습니다. 브라우저/OS 설정에서 알림을 허용했는지 확인해 주세요.');
+                      return;
                     }
 
-                    const perm = await Notification.requestPermission();
-                    alert(`알림 권한: ${perm}`);
+                    // 저장 결과가 궁금하면 "구독 상태 보기" 버튼으로 확인 가능
+                    alert('알림이 켜졌습니다! (권한 + 구독 저장 완료)');
                   } catch (e) {
                     console.error(e);
-                    alert('알림 권한 요청 중 오류가 발생했습니다.');
+                    alert(`알림 켜기 실패: ${e?.message || String(e)}`);
                   }
                 }}
               >
-                알림 켜기 (권한 요청)
+                알림 켜기 (권한 + 구독 저장)
               </button>
 
               <button
                 className="px-5 py-3 rounded-full bg-white border font-bold hover:bg-gray-50 transition"
                 onClick={async () => {
                   try {
-                    if (!('Notification' in window)) {
-                      alert('이 브라우저는 알림을 지원하지 않습니다.');
-                      return;
-                    }
-
-                    // 권한이 granted가 아니면 먼저 요청
-                    let perm: NotificationPermission = Notification.permission;
-                    if (perm !== 'granted') perm = await Notification.requestPermission();
-                    if (perm !== 'granted') {
-                      alert('알림 권한이 허용되지 않았습니다.');
-                      return;
-                    }
-
-                    // 실제 웹푸시 구독 + 저장 (VAPID 키 필요)
-                    const { ensurePushSubscribed } = await import('../services/pushService');
-                    const result: any = await ensurePushSubscribed();
-      if (result?.anonymous) {
-        alert('웹푸시 구독 저장 완료! (비로그인: user_id 없이 저장됨)');
-      } else {
-        alert('웹푸시 구독 및 저장 완료!');
-      }
-                  } catch (e) {
-                    console.error(e);
-                    alert(`푸시 구독 실패: ${e?.message || String(e)}`);
+                    const { unsubscribePush } = await import('../services/pushService');
+                    await unsubscribePush();
+                    alert('알림을 껐습니다.');
+                  } catch {
+                    alert('알림을 끄지 못했습니다.');
                   }
                 }}
               >
-                웹 푸시 구독 저장 (선택)
+                알림 끄기
+              </button>
+
+              <button
+                className="px-5 py-3 rounded-full bg-indigo-600 text-white font-bold hover:bg-indigo-500 transition"
+                onClick={async () => {
+                  setPushDebugLoading(true);
+                  try {
+                    const { getClientPushStatus } = await import('../services/pushService');
+                    const client = await getClientPushStatus();
+                    setPushDebug(client);
+
+                    const endpoint = client?.subscription?.endpoint;
+                    if (endpoint) {
+                      const r = await fetch('/api/push-status', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ endpoint }),
+                      });
+                      const j = await r.json().catch(() => ({}));
+                      setPushDbStatus(j);
+                    } else {
+                      setPushDbStatus({ ok: false, error: '이 브라우저에 구독(subscription)이 없습니다.' });
+                    }
+                  } catch (e) {
+                    setPushDbStatus({ ok: false, error: e?.message || String(e) });
+                  } finally {
+                    setPushDebugLoading(false);
+                  }
+                }}
+              >
+                {pushDebugLoading ? '확인 중...' : '구독 상태 보기 (디버그)'}
               </button>
 
               <button
@@ -990,6 +1003,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 테스트 알림 보내기 (내 폰에서)
               </button>
             </div>
+
+            {(pushDebug || pushDbStatus) && (
+              <div className="mt-6 rounded-2xl border bg-gray-50 p-5 text-sm">
+                <div className="font-black text-gray-800 mb-2">디버그 결과</div>
+                <pre className="whitespace-pre-wrap break-all text-xs text-gray-700 leading-relaxed">
+{JSON.stringify({ client: pushDebug, db: pushDbStatus }, null, 2)}
+                </pre>
+              </div>
+            )}
           </div>
         )}
 

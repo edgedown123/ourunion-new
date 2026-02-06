@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
     }
 
-    const { endpoint, p256dh, auth, userAgent } = req.body || {};
+    const { endpoint, p256dh, auth, userAgent, isPwa, displayMode, platform } = req.body || {};
     if (!endpoint) return res.status(400).json({ ok: false, error: 'Missing endpoint' });
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
@@ -44,27 +44,29 @@ export default async function handler(req, res) {
     // user_id가 있을 때만 저장(익명 저장 시 기존 user_id를 덮어쓰지 않기 위함)
     const payload = user_id ? { ...payloadBase, user_id } : payloadBase;
 
-    // userAgent 컬럼이 있는 DB/없는 DB 모두 대응
-    const payloadWithUA = userAgent ? { ...payload, user_agent: String(userAgent).slice(0, 500) } : payload;
+    // 추가 메타데이터(컬럼이 없을 수도 있으므로 서버에서 유연하게 처리)
+    const extra = {
+      ...(userAgent ? { user_agent: String(userAgent).slice(0, 500) } : {}),
+      ...(typeof isPwa === 'boolean' ? { is_pwa: isPwa } : {}),
+      ...(displayMode ? { display_mode: String(displayMode).slice(0, 50) } : {}),
+      ...(platform ? { platform: String(platform).slice(0, 80) } : {}),
+    };
 
     let upsertError = null;
 
-// 1차: user_agent 포함 시도(컬럼이 없을 수 있어 실패하면 재시도)
-if (payloadWithUA && payloadWithUA.user_agent) {
-  const { error } = await supabaseAdmin.from('push_subscriptions').upsert(payloadWithUA, { onConflict: 'endpoint' });
-  upsertError = error;
+    // 1차: extra 포함
+    const { error: e1 } = await supabaseAdmin.from('push_subscriptions').upsert({ ...payload, ...extra }, { onConflict: 'endpoint' });
+    upsertError = e1;
 
-  // user_agent 컬럼이 없다는 에러면 무시하고 아래에서 재시도
-  if (upsertError && /user_agent/i.test(upsertError.message || '')) {
-    upsertError = null;
-  }
-}
-
-// 2차: user_agent 없이 (또는 userAgent 없음 / 컬럼 없음으로 판단되어 재시도)
-if (!payloadWithUA?.user_agent || upsertError === null) {
-  const { error } = await supabaseAdmin.from('push_subscriptions').upsert(payload, { onConflict: 'endpoint' });
-  upsertError = error;
-}
+    // 컬럼이 없어서 실패하면, extra를 빼고 재시도
+    if (upsertError) {
+      const msg = (upsertError.message || '').toLowerCase();
+      const looksLikeMissingColumn = msg.includes('column') || msg.includes('does not exist') || msg.includes('unknown');
+      if (looksLikeMissingColumn) {
+        const { error: e2 } = await supabaseAdmin.from('push_subscriptions').upsert(payload, { onConflict: 'endpoint' });
+        upsertError = e2;
+      }
+    }
 
 
     if (upsertError) return res.status(500).json({ ok: false, error: upsertError.message });

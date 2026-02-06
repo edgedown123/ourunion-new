@@ -31,6 +31,35 @@ export function isPushSupported() {
   return typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
+function getDisplayMode(): string {
+  if (typeof window === 'undefined') return 'unknown';
+  const nav: any = navigator as any;
+
+  // iOS Safari legacy
+  if (nav?.standalone) return 'standalone';
+
+  if (window.matchMedia?.('(display-mode: standalone)').matches) return 'standalone';
+  if (window.matchMedia?.('(display-mode: minimal-ui)').matches) return 'minimal-ui';
+  if (window.matchMedia?.('(display-mode: fullscreen)').matches) return 'fullscreen';
+  return 'browser';
+}
+
+export function getPushEnvironment() {
+  if (typeof window === 'undefined') {
+    return {
+      userAgent: '',
+      platform: '',
+      displayMode: 'unknown',
+      isPwa: false,
+    };
+  }
+  const userAgent = navigator.userAgent || '';
+  const platform = (navigator as any).userAgentData?.platform || (navigator.platform || '');
+  const displayMode = getDisplayMode();
+  const isPwa = displayMode !== 'browser' && displayMode !== 'unknown';
+  return { userAgent, platform, displayMode, isPwa };
+}
+
 export async function getNotificationPermission() {
   if (!('Notification' in window)) return 'denied' as NotificationPermission;
   return Notification.permission;
@@ -41,13 +70,17 @@ export async function requestNotificationPermission() {
   return await Notification.requestPermission();
 }
 
-export async function ensurePushSubscribed() {
+export async function ensurePushSubscribed(opts?: { silent?: boolean }) {
   if (!isPushSupported()) throw new Error('이 브라우저는 푸시 알림을 지원하지 않습니다.');
   if (!supabase) throw new Error('Supabase가 설정되지 않았습니다.');
   if (!VAPID_PUBLIC_KEY) throw new Error('VAPID 공개키(VITE_VAPID_PUBLIC_KEY)가 설정되지 않았습니다.');
 
   const perm = await getNotificationPermission();
   if (perm !== 'granted') {
+    if (opts?.silent) {
+      // 자동 재등록 모드에서는 사용자 팝업을 띄우지 않습니다.
+      throw new Error('알림 권한이 granted가 아닙니다. (silent)');
+    }
     const p = await requestNotificationPermission();
     if (p !== 'granted') throw new Error('알림 권한이 허용되지 않았습니다.');
   }
@@ -77,13 +110,23 @@ export async function ensurePushSubscribed() {
   const p256dh = (json.keys as any)?.p256dh ?? null;
   const auth = (json.keys as any)?.auth ?? null;
 
+  const env = getPushEnvironment();
+
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 
   const res = await fetch('/api/push-subscribe', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ endpoint, p256dh, auth, userAgent: navigator.userAgent }),
+    body: JSON.stringify({
+      endpoint,
+      p256dh,
+      auth,
+      userAgent: env.userAgent,
+      platform: env.platform,
+      isPwa: env.isPwa,
+      displayMode: env.displayMode,
+    }),
   });
 
   if (!res.ok) {
@@ -93,6 +136,47 @@ export async function ensurePushSubscribed() {
 
   const resp = await res.json().catch(() => ({} as any));
   return { sub, ...resp };
+}
+
+export async function getClientPushStatus() {
+  const supported = isPushSupported();
+  const permission = await getNotificationPermission().catch(() => 'denied' as NotificationPermission);
+  const env = getPushEnvironment();
+
+  let swReady = false;
+  let swScope: string | null = null;
+  let subscription: any = null;
+
+  if (supported) {
+    try {
+      const reg = await Promise.race([
+        navigator.serviceWorker.ready,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('ready timeout')), 3000)),
+      ]) as ServiceWorkerRegistration;
+      swReady = true;
+      swScope = reg.scope || null;
+      const sub = await reg.pushManager.getSubscription();
+      if (sub) {
+        const json = sub.toJSON();
+        subscription = {
+          endpoint: sub.endpoint,
+          p256dh: (json.keys as any)?.p256dh ?? null,
+          auth: (json.keys as any)?.auth ?? null,
+        };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return {
+    supported,
+    permission,
+    env,
+    swReady,
+    swScope,
+    subscription,
+  };
 }
 
 export async function unsubscribePush() {
