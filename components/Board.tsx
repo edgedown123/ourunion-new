@@ -37,6 +37,11 @@ const Board: React.FC<BoardProps> = ({
 
   const selectedPost = selectedPostId ? posts.find(p => p.id === selectedPostId && p.type === type) : null;
 
+  // ✅ 로그인하지 않은 상태에서는 게시물 상세를 열 수 없도록 차단
+  const isGuest = userRole === 'guest';
+  const isPostDetailLocked = isGuest && !!selectedPostId;
+
+
   // 날짜 포맷팅 유틸리티 함수 (YYYY.MM.DD HH:mm)
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return '';
@@ -116,6 +121,24 @@ const Board: React.FC<BoardProps> = ({
   };
 
   // 상세 보기 모드
+  // ✅ 로그인하지 않은 상태에서는 게시물 상세를 열 수 없도록 차단
+  if (isPostDetailLocked) {
+    return (
+      <div className="mx-auto max-w-3xl p-6 text-center">
+        <h2 className="text-xl font-semibold">로그인이 필요합니다</h2>
+        <p className="mt-2 text-sm text-gray-600">
+          게시물 내용을 보려면 먼저 로그인해 주세요.
+        </p>
+        <button
+          className="mt-5 rounded-md bg-blue-600 px-4 py-2 text-white"
+          onClick={() => onSelectPost(null)}
+        >
+          목록으로 돌아가기
+        </button>
+      </div>
+    );
+  }
+
   if (selectedPost) {
     const imageAttachments = selectedPost.attachments?.filter(a => a.type.startsWith('image/')) || [];
 
@@ -527,7 +550,13 @@ const renderContentWithInlineImages = (raw: string) => {
             <ul className="divide-y divide-gray-50">
               {data.map(post => (
                 <li key={post.id}>
-                  <button onClick={() => onSelectPost(post.id)} className="w-full text-left p-6 hover:bg-gray-50 transition-colors group">
+                  <button onClick={() => {
+            if (userRole === 'guest') {
+              alert('로그인이 필요합니다.');
+              return;
+            }
+            onSelectPost(post.id);
+          }} className="w-full text-left p-6 hover:bg-gray-50 transition-colors group">
                     <div className="flex justify-between items-center">
                       <p className="font-bold text-gray-700 truncate group-hover:text-sky-primary transition-colors flex-1 mr-4">{post.title}</p>
                       <span className="text-[11px] text-gray-300 font-black whitespace-nowrap">{formatDate(post.createdAt)}</span>
@@ -591,7 +620,13 @@ const renderContentWithInlineImages = (raw: string) => {
               filteredPosts.map((post) => (
                 <li key={post.id}>
                   <button
-                    onClick={() => onSelectPost(post.id)}
+                    onClick={() => {
+            if (userRole === 'guest') {
+              alert('로그인이 필요합니다.');
+              return;
+            }
+            onSelectPost(post.id);
+          }}
                     className={`block w-full text-left hover:bg-gray-50/40 transition-all group ${isCompactList ? 'p-4 md:p-8' : 'p-8 md:p-10'}`}
                   >
                     <div className={`flex justify-between items-start ${isCompactList ? 'mb-2' : 'mb-4'}`}>
