@@ -799,8 +799,8 @@ const handleRequestWithdraw = () => {
       return;
     }
     setWithdrawPassword('');
-    // 로그인 이메일을 기본값으로 입력해두고(데스크톱/모바일 공통) 사용자가 확인 후 진행
-    setWithdrawEmail(loggedInMember?.email || '');
+    // 이메일은 자동 채우지 않음: 본인이 로그인 이메일을 직접 입력하도록 함
+    setWithdrawEmail('');
     setShowWithdraw(true);
   };
 
