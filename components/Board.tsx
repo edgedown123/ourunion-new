@@ -552,7 +552,8 @@ const renderContentWithInlineImages = (raw: string) => {
                 <li key={post.id}>
                   <button onClick={() => {
             if (userRole === 'guest') {
-              alert('로그인이 필요합니다.');
+              setShowApprovalPending(true);
+      return;
               return;
             }
             onSelectPost(post.id);
@@ -622,7 +623,8 @@ const renderContentWithInlineImages = (raw: string) => {
                   <button
                     onClick={() => {
             if (userRole === 'guest') {
-              alert('로그인이 필요합니다.');
+              setShowApprovalPending(true);
+      return;
               return;
             }
             onSelectPost(post.id);
@@ -654,7 +656,29 @@ const renderContentWithInlineImages = (raw: string) => {
           </ul>
         </div>
       )}
-    </div>
+    
+      {showApprovalPending && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white rounded-[3rem] p-10 max-w-[360px] w-[90%] shadow-2xl relative text-center">
+            <button onClick={() => setShowApprovalPending(false)} className="absolute top-8 right-8 text-gray-300 hover:text-gray-500 transition-colors"><i className="fas fa-times text-xl"></i></button>
+            <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><i className="fas fa-user-clock text-orange-400 text-3xl"></i></div>
+            <h3 className="text-2xl font-black text-gray-900 mb-4">회원 전용 메뉴입니다</h3>
+            <p className="text-sm text-gray-500 font-medium leading-relaxed mb-8">
+              회원 이시면 로그인 해주세요<br/>
+              비회원 이시면 회원 가입 후 <span className="text-orange-500 font-bold">승인</span>되면<br/>
+              이용하실 수 있습니다
+            </p>
+            <button 
+              onClick={() => setShowApprovalPending(false)} 
+              className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-base shadow-xl hover:bg-black transition-all active:scale-95"
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+</div>
   );
 };
 
