@@ -721,7 +721,7 @@ const handleMemberLogin = async () => {
     try {
       setForgotLoading(true);
       const redirectTo = `${window.location.origin}/?reset=1`;
-      const { error } = await cloud.requestPasswordResetEmail(forgotEmail, redirectTo);
+      const { error } = await cloud.requestPasswordResetEmail("");
       if (error) throw error;
 
       alert('입력하신 이메일로 비밀번호 재설정 링크를 발송했습니다.\n메일함(스팸함 포함)을 확인해주세요.');
@@ -1162,7 +1162,7 @@ await cloud.deleteMemberFromCloud(user.id);
                   className="w-full border-2 border-gray-50 rounded-2xl p-4 text-sm outline-none focus:border-sky-primary transition-colors bg-gray-50/50 font-bold"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendResetEmail()}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendResetEmail("")}
                   autoFocus
                 />
               </div>
