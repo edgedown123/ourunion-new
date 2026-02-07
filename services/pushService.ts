@@ -139,6 +139,7 @@ if (!accessToken) {
       endpoint,
       p256dh,
       auth,
+      user: userInfo,
       userAgent: env.userAgent,
       platform: env.platform,
       isPwa: env.isPwa,

@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
     }
 
-    const { endpoint, p256dh, auth, userAgent, isPwa, displayMode, platform } = req.body || {};
+    const { endpoint, p256dh, auth, userAgent, isPwa, displayMode, platform, user, user_id: bodyUserId, email: bodyEmail } = req.body || {};
     if (!endpoint) return res.status(400).json({ ok: false, error: 'Missing endpoint' });
 
     const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
@@ -45,6 +45,18 @@ export default async function handler(req, res) {
       }
     }
 
+    // Fallback: if no bearer token, use client-provided user info from body
+    const bodyUser = user || {};
+    if (!user_id) user_id = bodyUserId || bodyUser.id || null;
+    if (!user_email) user_email = bodyEmail || bodyUser.email || null;
+
+    // Determine admin status from env list (server-side source of truth)
+    if (user_email && adminEmails.length > 0) {
+      is_admin = adminEmails.includes(String(user_email).toLowerCase());
+    }
+
+    anonymous = !(user_id || user_email);
+
     const payloadBase = {
       endpoint,
       p256dh: p256dh ?? null,
@@ -57,7 +69,7 @@ export default async function handler(req, res) {
 
     // 추가 메타데이터(컬럼이 없을 수도 있으므로 서버에서 유연하게 처리)
     const extra = {
-      ...(user_id ? { is_admin } : {}),
+      ...(user_email ? { is_admin } : {}),
       ...(user_email ? { email: String(user_email).toLowerCase() } : {}),
       ...(userAgent ? { user_agent: String(userAgent).slice(0, 500) } : {}),
       ...(typeof isPwa === 'boolean' ? { is_pwa: isPwa } : {}),
