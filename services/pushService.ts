@@ -1,6 +1,4 @@
 async function getAccessTokenWithRetry(maxMs = 5000, intervalMs = 250): Promise<string | null> {
-  if (!supabase) return null;
-
   const start = Date.now();
   while (Date.now() - start < maxMs) {
     const session = await supabase.auth.getSession();
@@ -11,7 +9,7 @@ async function getAccessTokenWithRetry(maxMs = 5000, intervalMs = 250): Promise<
   return null;
 }
 
-import { supabase } from './supabaseService';
+import { supabase } from './supabase';
 
 const VAPID_PUBLIC_KEY_RAW = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY : undefined) || '';
 const VAPID_PUBLIC_KEY = (VAPID_PUBLIC_KEY_RAW || '').trim();
