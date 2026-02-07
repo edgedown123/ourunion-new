@@ -14,7 +14,19 @@ function getJsonBody(req) {
 }
 
 function pickRecord(payload) {
-  return payload?.record ?? payload?.old ?? payload?.data?.record ?? null;
+  // Supabase Database Webhook payloads vary by version:
+  // - INSERT: { record } or { data: { record } }
+  // - DELETE: { old_record } or { old } or { data: { old_record } }
+  // - UPDATE: { record, old_record } ...
+  return (
+    payload?.record ??
+    payload?.old_record ??
+    payload?.old ??
+    payload?.data?.record ??
+    payload?.data?.old_record ??
+    payload?.data?.old ??
+    null
+  );
 }
 
 export default async function handler(req, res) {
@@ -28,10 +40,13 @@ export default async function handler(req, res) {
         return res.status(401).json({ ok: false, error: "Unauthorized (bad webhook secret)" });
       }
     }
-
     const payload = getJsonBody(req);
     const record = pickRecord(payload);
-    if (!record) return res.status(400).json({ ok: false, error: "Missing record" });
+    if (!record) {
+      console.error("[notify-admin-withdraw] Missing record. Payload was:", payload);
+      return res.status(400).json({ ok: false, error: "Missing record" });
+    }
+
 
     const {
       SUPABASE_URL,
