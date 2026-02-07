@@ -1,4 +1,3 @@
-import { supabase } from './supabase';
 async function getAccessTokenWithRetry(maxMs = 5000, intervalMs = 250): Promise<string | null> {
   if (!supabase) return null;
 
@@ -12,6 +11,7 @@ async function getAccessTokenWithRetry(maxMs = 5000, intervalMs = 250): Promise<
   return null;
 }
 
+import { supabase } from './supabaseService';
 
 const VAPID_PUBLIC_KEY_RAW = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY : undefined) || '';
 const VAPID_PUBLIC_KEY = (VAPID_PUBLIC_KEY_RAW || '').trim();
@@ -103,18 +103,7 @@ export async function ensurePushSubscribed(opts?: { silent?: boolean; requireAut
       applicationServerKey: appServerKey,
     }));
 
-// 로그인 토큰(Authorization)을 최대한 확보해서 서버가 유저/이메일을 검증할 수 있게 합니다.
-let accessToken = await getAccessTokenWithRetry(5000, 250);
-
-// 혹시 세션이 늦게 잡히는 경우를 위해 한번 refresh 시도
-if (!accessToken) {
-  try {
-    // @ts-ignore
-    await supabase.auth.refreshSession();
-  } catch {}
-  accessToken = await getAccessTokenWithRetry(5000, 250);
-}
-
+  const accessToken = await getAccessTokenWithRetry(5000, 250);
 
   // 조합원(로그인) 전용 흐름에서 강제하고 싶을 때
   if (opts?.requireAuth && !accessToken) {
@@ -139,7 +128,6 @@ if (!accessToken) {
       endpoint,
       p256dh,
       auth,
-      user: userInfo,
       userAgent: env.userAgent,
       platform: env.platform,
       isPwa: env.isPwa,
