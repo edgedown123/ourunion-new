@@ -15,11 +15,15 @@ export async function registerServiceWorker() {
 }
 
 // 알림 권한 + 푸시 구독 (사용자 액션 버튼에서 호출 권장)
+// ✅ 로그인 사용자(토큰) 기반으로 구독 정보를 저장하기 위해 requireAuth 를 기본 적용합니다.
 export async function enableNotifications() {
   try {
     const reg = await registerServiceWorker();
     if (!reg) throw new Error('서비스워커가 준비되지 않았습니다.');
-    await ensurePushSubscribed();
+
+    // ✅ 토큰이 준비되지 않으면 실패 처리(익명 저장 방지)
+    await ensurePushSubscribed({ requireAuth: true });
+
     return true;
   } catch (e) {
     console.error('알림 활성화 실패:', e);
@@ -43,6 +47,7 @@ export async function autoEnsurePushSubscription() {
     if (!reg) return;
 
     // silent 모드: 권한 팝업 없이 재등록/DB upsert만 수행
+    // 자동 모드는 익명 저장도 허용(로그인 유무/세션 준비 지연 대응)
     await ensurePushSubscribed({ silent: true });
   } catch (e) {
     // 자동 재등록은 조용히 실패해도 괜찮음
