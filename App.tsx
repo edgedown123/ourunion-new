@@ -16,6 +16,7 @@ import Footer from './components/Footer';
 import SignupForm from './components/SignupForm';
 import * as cloud from './services/supabaseService';
 import { isSupabaseEnabled } from './services/supabaseService';
+import { notifyAdminSignup, notifyAdminWithdraw } from './services/adminNotifyService';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -585,7 +586,15 @@ const handlePermanentDelete = (postId: string) => {
     const updatedMembers = [newMember, ...members];
     setMembers(updatedMembers);
     saveToLocal('members', updatedMembers);
-    await cloud.saveMemberToCloud(newMember);
+    
+await cloud.saveMemberToCloud(newMember);
+
+// 관리자에게 '가입 신청서 제출' 푸시 알림 (best-effort)
+try {
+  await notifyAdminSignup(newMember);
+} catch (e) {
+  console.warn('관리자 가입신청 푸시 알림 실패(무시):', e);
+}
 
     // 가입 직후에는 승인 전이므로, 세션이 생성되어 있더라도 강제로 로그아웃 시켜두는 것이 안전합니다.
     await cloud.signOut();
@@ -612,7 +621,15 @@ const handlePermanentDelete = (postId: string) => {
     const updatedMembers = members.filter(m => m.id !== memberId);
     setMembers(updatedMembers);
     saveToLocal('members', updatedMembers);
-    await cloud.deleteMemberFromCloud(memberId);
+
+// 관리자 강제 탈퇴 처리 시에도 관리자에게 푸시 알림 (best-effort)
+try {
+  await notifyAdminWithdraw(memberToRemove);
+} catch (e) {
+  console.warn('관리자 강제탈퇴 푸시 알림 실패(무시):', e);
+}
+
+await cloud.deleteMemberFromCloud(memberId);
     alert('정상적으로 처리되었습니다.');
   };
 
@@ -802,7 +819,20 @@ const handleRequestWithdraw = () => {
       if (reauthErr) throw reauthErr;
 
       // 2) members 행 삭제(탈퇴 처리)
-      await cloud.deleteMemberFromCloud(user.id);
+
+// 관리자에게 '회원 탈퇴' 푸시 알림 (best-effort)
+try {
+  const memberRecord =
+    loggedInMember ||
+    members.find((m) => m.id === user.id) ||
+    ({ name: email, garage: '' } as any);
+  await notifyAdminWithdraw(memberRecord);
+} catch (e) {
+  console.warn('관리자 탈퇴 푸시 알림 실패(무시):', e);
+}
+
+// 2) members 행 삭제(탈퇴 처리)
+await cloud.deleteMemberFromCloud(user.id);
 
       // 3) 로그아웃 + 로컬 상태 정리
       await cloud.signOut();
