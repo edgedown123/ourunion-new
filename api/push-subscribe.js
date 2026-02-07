@@ -18,17 +18,28 @@ export default async function handler(req, res) {
       auth: { persistSession: false },
     });
 
+    
     // Optional user linkage
     let user_id = null;
     let anonymous = true;
+    let user_email = null;
+    let is_admin = false;
 
+    const adminEmails = String(process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
     const authHeader = req.headers.authorization || '';
     if (authHeader.startsWith('Bearer ')) {
       const jwt = authHeader.slice('Bearer '.length);
       try {
-        const { data } = await supabaseAdmin.auth.getUser(jwt);
+                const { data } = await supabaseAdmin.auth.getUser(jwt);
         user_id = data?.user?.id || null;
+        user_email = data?.user?.email || null;
         anonymous = !user_id;
+        if (user_email && adminEmails.length > 0) {
+          is_admin = adminEmails.includes(String(user_email).toLowerCase());
+        }
       } catch {
         // ignore token errors; store anonymously
       }
@@ -46,6 +57,8 @@ export default async function handler(req, res) {
 
     // 추가 메타데이터(컬럼이 없을 수도 있으므로 서버에서 유연하게 처리)
     const extra = {
+      ...(user_id ? { is_admin } : {}),
+      ...(user_email ? { email: String(user_email).toLowerCase() } : {}),
       ...(userAgent ? { user_agent: String(userAgent).slice(0, 500) } : {}),
       ...(typeof isPwa === 'boolean' ? { is_pwa: isPwa } : {}),
       ...(displayMode ? { display_mode: String(displayMode).slice(0, 50) } : {}),
