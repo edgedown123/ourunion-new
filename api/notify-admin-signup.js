@@ -78,10 +78,13 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: `Failed to read admin subscriptions: ${error.message}` });
     }
 
-    const memberName = record?.name || "신규 신청자";
+    const memberNameRaw = record?.name || record?.email || "신규 신청자";
+    const memberName = String(memberNameRaw).includes("@")
+      ? String(memberNameRaw).split("@")[0]
+      : String(memberNameRaw);
     const garage = record?.garage ? ` (${record.garage})` : "";
     const title = "우리노동조합 · 가입 신청";
-    const body = `${memberName}${garage} 님이 가입 신청서를 제출했습니다.`;
+    const body = `${memberName}${garage} 회원이 가입 신청서를 제출했습니다.`;
     const url = "/#tab=admin&view=signup"; // 앱에서 admin 탭으로 이동(해시 기반)
     const tag = "admin-signup";
 

@@ -79,10 +79,13 @@ export default async function handler(req, res) {
       return res.status(500).json({ ok: false, error: `Failed to read admin subscriptions: ${error.message}` });
     }
 
-    const memberName = record?.name || "조합원";
+    const memberNameRaw = record?.name || record?.email || "조합원";
+    const memberName = String(memberNameRaw).includes("@")
+      ? String(memberNameRaw).split("@")[0]
+      : String(memberNameRaw);
     const garage = record?.garage ? ` (${record.garage})` : "";
     const title = "우리노동조합 · 회원 탈퇴";
-    const body = `${memberName}${garage} 님이 회원 탈퇴했습니다.`;
+    const body = `${memberName}${garage} 회원이 탈퇴하였습니다.`;
     const url = "/#tab=admin&view=members";
     const tag = "admin-withdraw";
 
