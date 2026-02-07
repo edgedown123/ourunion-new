@@ -1257,8 +1257,9 @@ await cloud.deleteMemberFromCloud(user.id);
             <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><i className="fas fa-user-clock text-orange-400 text-3xl"></i></div>
             <h3 className="text-2xl font-black text-gray-900 mb-4">회원 전용 메뉴입니다</h3>
             <p className="text-sm text-gray-500 font-medium leading-relaxed mb-8">
-              회원 가입 후 <span className="text-orange-500 font-bold">승인</span>되면<br/>
-              이용하실 수 있습니다.
+              회원 이시면 로그인 해주세요<br/>
+              비회원 이시면 회원 가입 후 <span className="text-orange-500 font-bold">승인</span>되면<br/>
+              이용하실 수 있습니다
             </p>
             <button 
               onClick={() => setShowApprovalPending(false)} 
