@@ -1,18 +1,59 @@
 async function getAccessTokenWithRetry(maxMs = 5000, intervalMs = 250): Promise<string | null> {
+  if (!supabase) return null;
+
   const start = Date.now();
   while (Date.now() - start < maxMs) {
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token || null;
     if (token) return token;
+
+    // Fallback: session not ready yet, try localStorage (Supabase v2)
+    const lsToken = typeof window !== 'undefined' ? getAccessTokenFromLocalStorage() : null;
+    if (lsToken) return lsToken;
     await new Promise((r) => setTimeout(r, intervalMs));
   }
   return null;
 }
 
-import { supabase } from './supabase';
+import { supabase } from './supabaseService';
 
 const VAPID_PUBLIC_KEY_RAW = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_VAPID_PUBLIC_KEY : undefined) || '';
 const VAPID_PUBLIC_KEY = (VAPID_PUBLIC_KEY_RAW || '').trim();
+
+function getSupabaseProjectRefFromUrl(url: string): string | null {
+  try {
+    const host = new URL(url).host; // e.g. xxx.supabase.co
+    const m = host.match(/^([a-z0-9-]+)\.supabase\.co$/i);
+    return m ? m[1] : null;
+  } catch {
+    return null;
+  }
+}
+
+function getAccessTokenFromLocalStorage(): string | null {
+  try {
+    // Supabase JS v2 stores session under key: sb-<project-ref>-auth-token
+    const supaUrl = (typeof import.meta !== 'undefined' ? (import.meta as any).env?.VITE_SUPABASE_URL : undefined) || '';
+    const ref = getSupabaseProjectRefFromUrl(String(supaUrl));
+    if (!ref) return null;
+
+    const key = `sb-${ref}-auth-token`;
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    // structure may be { access_token, ... } or { currentSession: {...} }
+    const token =
+      parsed?.access_token ||
+      parsed?.currentSession?.access_token ||
+      parsed?.data?.session?.access_token ||
+      null;
+
+    return typeof token === 'string' && token.length > 0 ? token : null;
+  } catch {
+    return null;
+  }
+}
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
