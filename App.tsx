@@ -122,6 +122,7 @@ const App: React.FC = () => {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
   const [withdrawPassword, setWithdrawPassword] = useState('');
+  const [withdrawEmail, setWithdrawEmail] = useState('');
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -798,11 +799,15 @@ const handleRequestWithdraw = () => {
       return;
     }
     setWithdrawPassword('');
+    // 로그인 이메일을 기본값으로 입력해두고(데스크톱/모바일 공통) 사용자가 확인 후 진행
+    setWithdrawEmail(loggedInMember?.email || '');
     setShowWithdraw(true);
   };
 
   const handleConfirmWithdraw = async () => {
     if (withdrawLoading) return;
+    if (!withdrawEmail?.trim()) return alert('이메일을 입력해주세요.');
+    if (!withdrawEmail?.trim()) return alert('이메일을 입력해주세요.');
     if (!withdrawPassword) return alert('비밀번호를 입력해주세요.');
     if (!cloud.isSupabaseEnabled()) return alert('Supabase 설정이 필요합니다.');
 
@@ -814,8 +819,13 @@ const handleRequestWithdraw = () => {
       const email = user?.email;
       if (!user || !email) throw new Error('로그인 정보를 확인할 수 없습니다.');
 
+      const inputEmail = withdrawEmail.trim();
+      if (inputEmail.toLowerCase() !== email.toLowerCase()) {
+        throw new Error('탈퇴 이메일이 로그인 이메일과 다릅니다. 로그인 이메일을 입력해주세요.');
+      }
+
       // 1) 비밀번호로 재확인(재로그인)
-      const { error: reauthErr } = await cloud.signInWithEmailPassword(email, withdrawPassword);
+      const { error: reauthErr } = await cloud.signInWithEmailPassword(inputEmail, withdrawPassword);
       if (reauthErr) throw reauthErr;
 
       // 2) members 행 삭제(탈퇴 처리)
@@ -1264,7 +1274,16 @@ await cloud.deleteMemberFromCloud(user.id);
       {showWithdraw && (
         <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white rounded-[3rem] p-10 max-w-[380px] w-[92%] shadow-2xl relative">
-            <button onClick={() => setShowWithdraw(false)} className="absolute top-8 right-8 text-gray-300 hover:text-gray-500 transition-colors"><i className="fas fa-times text-xl"></i></button>
+            <button
+              onClick={() => {
+                setShowWithdraw(false);
+                setWithdrawEmail('');
+                setWithdrawPassword('');
+              }}
+              className="absolute top-8 right-8 text-gray-300 hover:text-gray-500 transition-colors"
+            >
+              <i className="fas fa-times text-xl"></i>
+            </button>
 
             <div className="text-center mb-8">
               <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
@@ -1274,16 +1293,29 @@ await cloud.deleteMemberFromCloud(user.id);
               <p className="text-sm text-gray-500 font-medium leading-relaxed">
                 정말 탈퇴하시겠습니까?<br />
                 탈퇴하면 <span className="font-bold">자유게시판·자료실 이용 권한</span>이 종료됩니다.<br />
-                계속 진행하시려면 비밀번호를 입력해 주세요.
+                계속 진행하시려면 <span className="font-bold">이메일과 비밀번호</span>를 입력해 주세요.
               </p>
             </div>
 
             <div className="space-y-4">
               <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 ml-2 uppercase tracking-widest">Email</label>
+                <input
+                  type="email"
+                  placeholder="example@email.com"
+                  autoComplete="email"
+                  className="w-full border-2 border-gray-50 rounded-2xl p-4 text-sm outline-none focus:border-red-400 transition-colors bg-gray-50/50 font-bold"
+                  value={withdrawEmail}
+                  onChange={(e) => setWithdrawEmail(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmWithdraw()}
+                />
+              </div>
+              <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 ml-2 uppercase tracking-widest">Password</label>
                 <input
                   type="password"
                   placeholder="••••••••"
+                  autoComplete="current-password"
                   className="w-full border-2 border-gray-50 rounded-2xl p-4 text-sm outline-none focus:border-red-400 transition-colors bg-gray-50/50 font-bold"
                   value={withdrawPassword}
                   onChange={(e) => setWithdrawPassword(e.target.value)}
@@ -1299,7 +1331,11 @@ await cloud.deleteMemberFromCloud(user.id);
                 {withdrawLoading ? '처리 중...' : '탈퇴하기'}
               </button>
               <button
-                onClick={() => setShowWithdraw(false)}
+                onClick={() => {
+                  setShowWithdraw(false);
+                  setWithdrawEmail('');
+                  setWithdrawPassword('');
+                }}
                 className="w-full py-3 text-sm font-black text-gray-400 hover:text-gray-900 transition-colors"
                 disabled={withdrawLoading}
               >

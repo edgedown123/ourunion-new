@@ -368,8 +368,9 @@ const onDisableNoti = async () => {
             className="w-full"
           >
             <div className="w-full h-[60px] sm:h-[64px] rounded-2xl shadow-md overflow-hidden bg-white hover:brightness-95 active:scale-[0.99] transition-all">
+              {/* NOTE: public/images/youtube-withdraw.png 로 통일 */}
               <img
-                src="/images/youtube-회원탈퇴.png"
+                src="/images/youtube-withdraw.png"
                 alt="회원 탈퇴"
                 className="w-full h-full object-contain"
               />
@@ -386,11 +387,12 @@ const onDisableNoti = async () => {
         className="w-full max-w-[360px] mx-auto"
       >
         <div className="w-full h-[60px] sm:h-[64px] rounded-2xl shadow-md overflow-hidden bg-white hover:brightness-95 active:scale-[0.99] transition-all">
-          <img
-            src="/images/youtube-회원탈퇴.png"
-            alt="회원 탈퇴"
-            className="w-full h-full object-contain"
-          />
+              {/* NOTE: public/images/youtube-withdraw.png 로 통일 */}
+              <img
+                src="/images/youtube-withdraw.png"
+                alt="회원 탈퇴"
+                className="w-full h-full object-contain"
+              />
         </div>
       </button>
     )}
