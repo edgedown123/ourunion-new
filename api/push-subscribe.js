@@ -4,14 +4,17 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
 
   try {
-    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !serviceRoleKey) {
-      return res.status(500).json({ ok: false, error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY' });
+      return res.status(500).json({
+        ok: false,
+        error: 'Missing SUPABASE_URL (or NEXT_PUBLIC_SUPABASE_URL) or SUPABASE_SERVICE_ROLE_KEY',
+        debug: { hasSupabaseUrl: !!supabaseUrl, hasServiceRoleKey: !!serviceRoleKey },
+      });
     }
 
-    // Vercel 환경변수: ADMIN_EMAILS = "admin1@example.com,admin2@example.com"
     const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
       .split(',')
       .map((e) => e.trim())
@@ -20,73 +23,63 @@ export default async function handler(req, res) {
     const { endpoint, p256dh, auth, userAgent, isPwa, displayMode, platform } = req.body || {};
     if (!endpoint) return res.status(400).json({ ok: false, error: 'Missing endpoint' });
 
-    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false },
-    });
-
-    // Optional user linkage + email/admin 판별
-    let user_id = null;
-    let email = null;
-    let is_admin = false;
-    let anonymous = true;
+    const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
 
     const authHeader = req.headers.authorization || '';
-    if (authHeader.startsWith('Bearer ')) {
-      const jwt = authHeader.slice('Bearer '.length);
-      try {
-        const { data } = await supabaseAdmin.auth.getUser(jwt);
+    const hasBearer = authHeader.startsWith('Bearer ');
+    const token = hasBearer ? authHeader.slice('Bearer '.length) : null;
+
+    let email = null;
+    let user_id = null;
+    let is_admin = false;
+
+    if (token) {
+      const { data, error } = await supabaseAdmin.auth.getUser(token);
+      if (!error) {
         user_id = data?.user?.id || null;
         email = data?.user?.email || null;
-        anonymous = !user_id;
         if (email) is_admin = ADMIN_EMAILS.includes(email);
-      } catch {
-        // ignore token errors; store anonymously
       }
     }
 
-    const payloadBase = {
-      endpoint,
-      p256dh: p256dh ?? null,
-      auth: auth ?? null,
-      last_seen_at: new Date().toISOString(),
-    };
-
-    // user_id가 있을 때만 저장(익명 저장 시 기존 user_id를 덮어쓰지 않기 위함)
-    const payload = user_id ? { ...payloadBase, user_id } : payloadBase;
-
-    // 추가 메타데이터(컬럼이 없을 수도 있으므로 서버에서 유연하게 처리)
-    const extra = {
-      ...(userAgent ? { user_agent: String(userAgent).slice(0, 500) } : {}),
-      ...(typeof isPwa === 'boolean' ? { is_pwa: isPwa } : {}),
-      ...(displayMode ? { display_mode: String(displayMode).slice(0, 50) } : {}),
-      ...(platform ? { platform: String(platform).slice(0, 80) } : {}),
-      ...(email ? { email } : {}),
-      ...(email ? { is_admin } : {}), // email이 있을 때만 함께 저장
-    };
-
-    let upsertError = null;
-
-    // 1차: extra 포함
-    const { error: e1 } = await supabaseAdmin
+    const { error: upsertError } = await supabaseAdmin
       .from('push_subscriptions')
-      .upsert({ ...payload, ...extra }, { onConflict: 'endpoint' });
-    upsertError = e1;
+      .upsert(
+        {
+          endpoint,
+          p256dh: p256dh ?? null,
+          auth: auth ?? null,
+          user_agent: userAgent ?? null,
+          is_pwa: typeof isPwa === 'boolean' ? isPwa : null,
+          display_mode: displayMode ?? null,
+          platform: platform ?? null,
+          email,
+          is_admin,
+          last_seen_at: new Date().toISOString(),
+        },
+        { onConflict: 'endpoint' }
+      );
 
-    // 컬럼이 없어서 실패하면, extra를 빼고 재시도
     if (upsertError) {
-      const msg = (upsertError.message || '').toLowerCase();
-      const looksLikeMissingColumn = msg.includes('column') || msg.includes('does not exist') || msg.includes('unknown');
-      if (looksLikeMissingColumn) {
-        const { error: e2 } = await supabaseAdmin
-          .from('push_subscriptions')
-          .upsert(payload, { onConflict: 'endpoint' });
-        upsertError = e2;
-      }
+      return res.status(500).json({ ok: false, error: upsertError.message });
     }
 
-    if (upsertError) return res.status(500).json({ ok: false, error: upsertError.message });
-
-    return res.status(200).json({ ok: true, stored: true, anonymous, user_id, email, is_admin });
+    return res.status(200).json({
+      ok: true,
+      stored: true,
+      email,
+      is_admin,
+      debug: {
+        hasAuthorizationHeader: !!authHeader,
+        hasBearer,
+        tokenLength: token ? token.length : 0,
+        adminEmailsCount: ADMIN_EMAILS.length,
+        adminEmails: ADMIN_EMAILS,
+        supabaseUrlHost: (() => {
+          try { return new URL(supabaseUrl).host; } catch { return null; }
+        })(),
+      },
+    });
   } catch (e) {
     return res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
