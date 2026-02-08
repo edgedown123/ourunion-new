@@ -629,7 +629,7 @@ const renderContentWithInlineImages = (raw: string) => {
           </h2>
           <p className="text-gray-400 font-bold text-xs mt-2 ml-1">우리노동조합 소통 공간</p>
         </div>
-        {userRole !== 'guest' && (userRole === 'admin' || type === 'free') && type !== 'notice' && (
+        {userRole !== 'guest' && (userRole === 'admin' || type === 'free' || type === 'resources') && type !== 'notice' && (
           <button 
             onClick={() => onWriteClick(type)} 
             className="bg-sky-primary text-white px-4 py-2 md:px-8 md:py-4 rounded-xl md:rounded-[1.5rem] font-black text-xs md:text-base shadow-xl shadow-sky-100 hover:opacity-90 active:scale-95 transition-all"

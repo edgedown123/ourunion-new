@@ -134,6 +134,57 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('union_member');
     try { return saved ? JSON.parse(saved) : null; } catch { return null; }
   });
+
+  // -------------------------------------------------
+  // ✅ 권한 가드
+  // - 게스트(로그아웃): 공지사항/자유게시판/자료실 접근 불가
+  // - 조합원: 공지사항 보기 가능, 글쓰기는 자유게시판/자료실만 가능
+  // - 관리자: 전체 가능
+  // (hash/#tab=... 직접 접근도 막기 위해 App 레벨에서 한 번 더 가드)
+  // -------------------------------------------------
+  useEffect(() => {
+    if (userRole !== 'guest') return;
+
+    const guestRestricted = new Set(['notice', 'notice_all', 'family_events', 'free', 'resources']);
+    if (!guestRestricted.has(activeTab)) return;
+
+    // 회원 전용 안내 팝업 + 홈으로 돌려보내기
+    setShowApprovalPending(true);
+    setActiveTab('home');
+    setIsWriting(false);
+    setWritingType(null);
+    setEditingPost(null);
+    setSelectedPostId(null);
+    replaceNav({ tab: 'home', postId: null, writing: false });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole, activeTab]);
+
+  useEffect(() => {
+    if (!isWriting) return;
+
+    const targetType = ((writingType || (activeTab === 'notice' ? 'notice_all' : activeTab)) as any) as string;
+
+    // 게스트는 어떤 글쓰기 화면도 접근 불가
+    if (userRole === 'guest') {
+      setShowApprovalPending(true);
+      setIsWriting(false);
+      setWritingType(null);
+      setEditingPost(null);
+      replaceNav({ tab: activeTab, postId: null, writing: false });
+      return;
+    }
+
+    // 공고/공지, 경조사 글쓰기는 관리자만
+    if (['notice_all', 'family_events'].includes(targetType) && userRole !== 'admin') {
+      setIsWriting(false);
+      setWritingType(null);
+      setEditingPost(null);
+      setShowAdminLogin(true);
+      replaceNav({ tab: activeTab, postId: null, writing: false });
+      return;
+    }
+  }, [isWriting, writingType, activeTab, userRole]);
   
   const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
@@ -392,8 +443,9 @@ const invalidateMembersCache = () => {
     const isDesktop = window.matchMedia('(min-width: 768px)').matches;
     // 데스크톱: 공지사항 탭은 공고/공지( notice_all )로 바로 이동
     if (isDesktop && nextTab === 'notice') nextTab = 'notice_all';
-    // 제한된 메뉴: 자유게시판(free), 자료실(resources)
-    const restrictedTabs = ['free', 'resources'];
+    // 제한된 메뉴(게스트): 공지사항(공고/공지, 경조사 포함), 자유게시판, 자료실
+    // - 모바일: notice(랜드)도 차단
+    const restrictedTabs = ['notice', 'notice_all', 'family_events', 'free', 'resources'];
     
     if (userRole === 'guest' && restrictedTabs.includes(nextTab)) {
       setShowApprovalPending(true);
@@ -907,7 +959,8 @@ await cloud.deleteMemberFromCloud(user.id);
   const handleWriteClick = (specificType?: BoardType) => {
     const rawType = specificType || activeTab;
     const targetType = (rawType === 'notice' ? 'notice_all' : rawType) as any;
-    if (['notice_all', 'family_events', 'resources'].includes(targetType as string) && userRole !== 'admin') {
+    // 공고/공지, 경조사는 관리자만 글쓰기 가능
+    if (['notice_all', 'family_events'].includes(targetType as string) && userRole !== 'admin') {
       setShowAdminLogin(true);
       return;
     }
