@@ -119,6 +119,55 @@ const Board: React.FC<BoardProps> = ({
   if (selectedPost) {
     const imageAttachments = selectedPost.attachments?.filter(a => a.type.startsWith('image/')) || [];
 
+    /**
+     * 게시물/댓글 본문에 입력된 URL을 자동으로 링크로 변환합니다.
+     * - http/https, www. 형태 지원
+     * - 문장 끝의 ". , ) ] }" 등 흔한 구두점은 링크에서 제외
+     */
+    const linkifyText = (text: string): React.ReactNode[] => {
+      if (!text) return [];
+
+      // URL 후보를 찾고, 앞/뒤 문자를 최대한 보존합니다.
+      const urlRegex = /(https?:\/\/[^\s<]+|www\.[^\s<]+)/g;
+      const nodes: React.ReactNode[] = [];
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+
+      while ((match = urlRegex.exec(text)) !== null) {
+        const start = match.index;
+        const rawUrl = match[0];
+
+        if (start > lastIndex) {
+          nodes.push(text.slice(lastIndex, start));
+        }
+
+        // 흔한 문장부호는 링크에서 제외(원문은 유지)
+        const trailingPunct = /[).,!?\]}>"']+$/;
+        const m2 = rawUrl.match(trailingPunct);
+        const cut = m2 ? m2[0] : '';
+        const cleanUrl = cut ? rawUrl.slice(0, -cut.length) : rawUrl;
+        const href = cleanUrl.startsWith('http') ? cleanUrl : `https://${cleanUrl}`;
+
+        nodes.push(
+          <a
+            key={`url-${start}`}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sky-600 underline break-all hover:text-sky-700"
+          >
+            {cleanUrl}
+          </a>
+        );
+        if (cut) nodes.push(cut);
+
+        lastIndex = start + rawUrl.length;
+      }
+
+      if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+      return nodes;
+    };
+
 
 const renderContentWithInlineImages = (raw: string) => {
   const parts = raw.split(/\[\[img:(\d+)\]\]/g);
@@ -127,7 +176,13 @@ const renderContentWithInlineImages = (raw: string) => {
 
   for (let i = 0; i < parts.length; i++) {
     if (i % 2 === 0) {
-      if (parts[i]) nodes.push(<span key={`t-${i}`} className="whitespace-pre-wrap">{parts[i]}</span>);
+      if (parts[i]) {
+        nodes.push(
+          <span key={`t-${i}`} className="whitespace-pre-wrap break-words">
+            {linkifyText(parts[i])}
+          </span>
+        );
+      }
     } else {
       const idx = Number(parts[i]);
       if (!Number.isNaN(idx) && imageAttachments[idx]) {
@@ -359,7 +414,9 @@ const renderContentWithInlineImages = (raw: string) => {
                     </div>
                   </div>
                 ) : (
-                  <p className="text-base text-gray-600 leading-relaxed pl-11 mb-3">{comment.content}</p>
+                  <p className="text-base text-gray-600 leading-relaxed pl-11 mb-3 whitespace-pre-wrap break-words">
+                    {linkifyText(comment.content)}
+                  </p>
                 )}
                 
                 <div className="pl-11 flex items-center justify-between">
@@ -473,7 +530,9 @@ const renderContentWithInlineImages = (raw: string) => {
                           </div>
                         </div>
                       ) : (
-                        <p className="text-sm text-gray-500 leading-relaxed pl-7">{reply.content}</p>
+                        <p className="text-sm text-gray-500 leading-relaxed pl-7 whitespace-pre-wrap break-words">
+                          {linkifyText(reply.content)}
+                        </p>
                       )}
                       <div className="pl-7 flex justify-end mt-1">
                         <span className="text-[10px] font-bold text-gray-300 uppercase">{formatDate(reply.createdAt)}</span>
