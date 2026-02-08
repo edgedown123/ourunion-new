@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect  } from 'react';
 import { BoardType, PostAttachment, Post } from '../types';
+import RichTextEditor from './RichTextEditor';
 interface PostEditorProps {
   type: BoardType;
   initialPost?: Post | null;
@@ -11,15 +12,33 @@ interface PostEditorProps {
 const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCancel }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const contentRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const [postPassword, setPostPassword] = useState('');
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+
+  const escapeHtml = (s: string) =>
+    s
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+  const plainToHtml = (s: string) => escapeHtml(s).replace(/\n/g, '<br/>');
+
+  const normalizeToHtml = (s: string) => {
+    const str = s ?? '';
+    // If it already looks like HTML (contains tags), keep it as-is
+    if (/<\/?[a-z][\s\S]*>/i.test(str)) return str;
+    return plainToHtml(str);
+  };
+
   useEffect(() => {
     if (initialPost) {
       setTitle(initialPost.title);
-      setContent(initialPost.content);
+      setContent(normalizeToHtml(initialPost.content));
       setPostPassword(initialPost.password || '');
       setAttachments(initialPost.attachments || []);
     }
@@ -139,7 +158,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           const next = [...prev, { name: file.name, data: fileData, type: file.type }];
 
           // 글쓰기 textarea가 마운트된 경우에만 커서 위치에 토큰 삽입
-          if (imageIndex >= 0 && contentRef.current) {
+          if (imageIndex >= 0) {
             insertImageTokenAtCursor(`[[img:${imageIndex}]]`);
           }
           return next;
@@ -159,32 +178,40 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   };
 
 
-  const insertImageTokenAtCursor = (token: string) => {
-    const ta = contentRef.current;
-    setContent(prev => {
-      // textarea가 아직 없으면 맨 아래에 추가
-      if (!ta) return prev ? `${prev}\n${token}\n` : `${token}\n`;
+    const insertImageTokenAtCursor = (token: string) => {
+    const el = editorRef.current;
 
-      const start = ta.selectionStart ?? prev.length;
-      const end = ta.selectionEnd ?? prev.length;
+    // Prefer inserting at caret inside the rich editor.
+    if (el) {
+      el.focus();
+      const html = `<br/>${token}<br/>`;
+      let ok = false;
+      try {
+        // @ts-ignore
+        ok = document.execCommand('insertHTML', false, html);
+      } catch {}
 
-      const prefix = prev.slice(0, start);
-      const suffix = prev.slice(end);
+      if (!ok) {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0) {
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const frag = range.createContextualFragment(html);
+          range.insertNode(frag);
+          range.collapse(false);
+          sel.removeAllRanges();
+          sel.addRange(range);
+        } else {
+          el.innerHTML += html;
+        }
+      }
 
-      const before = prefix && !prefix.endsWith('\n') ? prefix + '\n' : prefix;
-      const after = suffix && !suffix.startsWith('\n') ? '\n' + suffix : suffix;
-      const next = `${before}${token}${after}`;
+      setContent(el.innerHTML);
+      return;
+    }
 
-      requestAnimationFrame(() => {
-        try {
-          const pos = before.length + token.length + (after.startsWith('\n') ? 1 : 0);
-          ta.focus();
-          ta.setSelectionRange(pos, pos);
-        } catch {}
-      });
-
-      return next;
-    });
+    // Fallback: append to end (should be rare)
+    setContent(prev => (prev ? `${prev}<br/>${token}<br/>` : `${token}<br/>`));
   };
 
   return (
@@ -268,19 +295,23 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
-          <textarea
-            ref={contentRef}
-            className="w-full border-gray-300 rounded-lg p-3 h-64 border focus:ring-sky-500 outline-none resize-none leading-relaxed"
+          <RichTextEditor
+            ref={editorRef}
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-          ></textarea>
+            onChange={setContent}
+            placeholder="내용을 입력하세요."
+            minHeightClassName="min-h-[260px]"
+          />
+          <p className="mt-2 text-[11px] text-gray-500 leading-relaxed">
+            * 글자 크기 / 굵기 / 기울기 / 밑줄 / 가운데줄 / 색상 변경만 지원합니다. (이미지 첨부는 기존 방식 그대로)
+          </p>
         </div>
 
         <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
             onClick={() => onSave(title, content, attachments, postPassword, initialPost?.id)}
-            disabled={!title || !content || !postPassword}
+            disabled={!title || !content || content === '<br>' || content === '<div><br></div>' || !postPassword}
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {initialPost ? '수정 완료' : '게시하기'}
