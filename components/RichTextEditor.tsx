@@ -213,18 +213,6 @@ const RichTextEditor = React.forwardRef<HTMLDivElement, Props>(
             </div>
           </div>
         )}
-            <div className="flex-1" />
-
-            <button
-              type="button"
-              onClick={() => exec("removeFormat")}
-              className="px-2.5 py-1 rounded-lg text-xs font-bold border border-gray-200 hover:bg-gray-50"
-              title="서식 제거"
-            >
-              서식삭제
-            </button>
-          </div>
-        </div>
 
         {/* Editor */}
         <div className="relative">
