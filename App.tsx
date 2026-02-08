@@ -16,6 +16,7 @@ import Footer from './components/Footer';
 import SignupForm from './components/SignupForm';
 import * as cloud from './services/supabaseService';
 import { isSupabaseEnabled } from './services/supabaseService';
+import { getClientPushStatus, isPushSupported } from './services/pushService';
 import { notifyAdminSignup, notifyAdminWithdraw } from './services/adminNotifyService';
 
 const App: React.FC = () => {
@@ -146,6 +147,9 @@ const App: React.FC = () => {
   // - "알림 받기" 성공 시 영구적으로 숨김
   // -----------------------------
   const [showPushOnboarding, setShowPushOnboarding] = useState(false);
+  // 로그인할 때마다: 푸시 알림이 꺼져 있으면 안내 팝업
+  const [showPushLoginPrompt, setShowPushLoginPrompt] = useState(false);
+  const [pushPromptName, setPushPromptName] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -194,6 +198,23 @@ const App: React.FC = () => {
     localStorage.removeItem(`union_push_onboard_dismiss_${memberId}`);
     setShowPushOnboarding(false);
   }, [loggedInMember?.id]);
+
+  const promptPushIfOff = async (name?: string) => {
+    try {
+      const supported = await isPushSupported();
+      if (!supported) return;
+
+      const status = await getClientPushStatus();
+      if (!status.enabled) {
+        setPushPromptName(name);
+        setShowPushLoginPrompt(true);
+      }
+    } catch (e) {
+      // 체크 실패는 무시(로그인 흐름 방해 X)
+      console.warn('[push] getClientPushStatus failed:', e);
+    }
+  };
+
 
   const dismissPushOnboardingForOneDay = useCallback(() => {
     if (typeof window === 'undefined') return;
@@ -640,7 +661,7 @@ await cloud.deleteMemberFromCloud(memberId);
     await cloud.saveSettingsToCloud(newSettings);
   };
 
-  const handleAdminLogin = () => {
+  const handleAdminLogin = async () => {
     if (adminPassword === '1229') {
       setIsAdminAuth(true);
       setUserRole('admin');
@@ -649,6 +670,9 @@ await cloud.deleteMemberFromCloud(memberId);
       setShowAdminLogin(false);
       setAdminPassword('');
       alert('관리자 모드로 접속되었습니다.');
+
+      // 관리자도 로그인 후 푸시 알림 상태 체크
+      await promptPushIfOff();
     } else {
       alert('비밀번호가 일치하지 않습니다.');
     }
@@ -693,6 +717,9 @@ const handleMemberLogin = async () => {
       setLoginEmail('');
       setLoginPassword('');
       alert(`${profile.name}님, 환영합니다!`);
+
+      // 로그인 후: 푸시 알림이 꺼져 있으면 안내 팝업
+      await promptPushIfOff(profile.name);
     } catch (err: any) {
       console.error(err);
 
@@ -991,6 +1018,14 @@ await cloud.deleteMemberFromCloud(user.id);
                 memberName={loggedInMember?.name}
                 onDone={markPushOnboardingDone}
                 onLater={dismissPushOnboardingForOneDay}
+              />
+            )}
+            {showPushLoginPrompt && (
+              <PushOnboardingCard
+                variant="reminder"
+                memberName={pushPromptName}
+                onDone={() => setShowPushLoginPrompt(false)}
+                onLater={() => setShowPushLoginPrompt(false)}
               />
             )}
             <Hero

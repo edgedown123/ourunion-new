@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { unsubscribePush } from './pushService'
 
 /**
  * ✅ 회원가입: Supabase Auth에 계정이 영구 생성됩니다.
@@ -24,6 +25,14 @@ export async function signIn(email: string, password: string) {
 
 /** ✅ 로그아웃: 절대 profiles/members를 delete 하지 마세요. */
 export async function signOut() {
+  // 로그아웃 시: 푸시 구독(브라우저) 해제 + 서버(DB)에서도 삭제
+  // (실패해도 로그아웃은 진행)
+  try {
+    await unsubscribePush()
+  } catch (e) {
+    console.warn('[signOut] unsubscribePush failed:', e)
+  }
+
   const { error } = await supabase.auth.signOut()
   if (error) throw error
 }
