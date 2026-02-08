@@ -188,6 +188,7 @@ const App: React.FC = () => {
     }
 
     setShowPushOnboarding(true);
+    setShowPushLoginPrompt(false);
   }, [activeTab, userRole, loggedInMember?.id, loggedInMember?.isApproved]);
 
   const markPushOnboardingDone = useCallback(() => {
@@ -204,6 +205,18 @@ const App: React.FC = () => {
       const supported = await isPushSupported();
       if (!supported) return;
 
+
+      // 가입승인 완료 온보딩 팝업이 뜰 예정이면(첫 로그인 등), 로그인 안내 팝업은 띄우지 않음
+      if (userRole === 'member' && loggedInMember?.id && loggedInMember?.isApproved !== false) {
+        const memberId = loggedInMember.id;
+        const doneKey = `union_push_onboard_done_${memberId}`;
+        const dismissKey = `union_push_onboard_dismiss_${memberId}`;
+        const done = localStorage.getItem(doneKey) === '1';
+        const dismissTs = Number(localStorage.getItem(dismissKey) || '0');
+        const DAY_MS = 24 * 60 * 60 * 1000;
+        const dismissedRecently = dismissTs && Date.now() - dismissTs < DAY_MS;
+        if (!done && !dismissedRecently) return;
+      }
       const status = await getClientPushStatus();
       if (!status.enabled) {
         setPushPromptName(name);
@@ -1020,7 +1033,7 @@ await cloud.deleteMemberFromCloud(user.id);
                 onLater={dismissPushOnboardingForOneDay}
               />
             )}
-            {showPushLoginPrompt && (
+            {showPushLoginPrompt && !showPushOnboarding && (
               <PushOnboardingCard
                 variant="reminder"
                 memberName={pushPromptName}
