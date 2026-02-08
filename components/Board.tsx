@@ -37,11 +37,6 @@ const Board: React.FC<BoardProps> = ({
 
   const selectedPost = selectedPostId ? posts.find(p => p.id === selectedPostId && p.type === type) : null;
 
-  // ✅ 로그인하지 않은 상태에서는 게시물 상세를 열 수 없도록 차단
-  const isGuest = userRole === 'guest';
-  const isPostDetailLocked = isGuest && !!selectedPostId;
-
-
   // 날짜 포맷팅 유틸리티 함수 (YYYY.MM.DD HH:mm)
   const formatDate = (dateStr: string | undefined) => {
     if (!dateStr) return '';
@@ -121,24 +116,6 @@ const Board: React.FC<BoardProps> = ({
   };
 
   // 상세 보기 모드
-  // ✅ 로그인하지 않은 상태에서는 게시물 상세를 열 수 없도록 차단
-  if (isPostDetailLocked) {
-    return (
-      <div className="mx-auto max-w-3xl p-6 text-center">
-        <h2 className="text-xl font-semibold">로그인이 필요합니다</h2>
-        <p className="mt-2 text-sm text-gray-600">
-          게시물 내용을 보려면 먼저 로그인해 주세요.
-        </p>
-        <button
-          className="mt-5 rounded-md bg-blue-600 px-4 py-2 text-white"
-          onClick={() => onSelectPost(null)}
-        >
-          목록으로 돌아가기
-        </button>
-      </div>
-    );
-  }
-
   if (selectedPost) {
     const imageAttachments = selectedPost.attachments?.filter(a => a.type.startsWith('image/')) || [];
 
@@ -550,14 +527,7 @@ const renderContentWithInlineImages = (raw: string) => {
             <ul className="divide-y divide-gray-50">
               {data.map(post => (
                 <li key={post.id}>
-                  <button onClick={() => {
-            if (userRole === 'guest') {
-              setShowApprovalPending(true);
-      return;
-              return;
-            }
-            onSelectPost(post.id);
-          }} className="w-full text-left p-6 hover:bg-gray-50 transition-colors group">
+                  <button onClick={() => onSelectPost(post.id)} className="w-full text-left p-6 hover:bg-gray-50 transition-colors group">
                     <div className="flex justify-between items-center">
                       <p className="font-bold text-gray-700 truncate group-hover:text-sky-primary transition-colors flex-1 mr-4">{post.title}</p>
                       <span className="text-[11px] text-gray-300 font-black whitespace-nowrap">{formatDate(post.createdAt)}</span>
@@ -621,14 +591,7 @@ const renderContentWithInlineImages = (raw: string) => {
               filteredPosts.map((post) => (
                 <li key={post.id}>
                   <button
-                    onClick={() => {
-            if (userRole === 'guest') {
-              setShowApprovalPending(true);
-      return;
-              return;
-            }
-            onSelectPost(post.id);
-          }}
+                    onClick={() => onSelectPost(post.id)}
                     className={`block w-full text-left hover:bg-gray-50/40 transition-all group ${isCompactList ? 'p-4 md:p-8' : 'p-8 md:p-10'}`}
                   >
                     <div className={`flex justify-between items-start ${isCompactList ? 'mb-2' : 'mb-4'}`}>
@@ -656,29 +619,7 @@ const renderContentWithInlineImages = (raw: string) => {
           </ul>
         </div>
       )}
-    
-      {showApprovalPending && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fadeIn">
-          <div className="bg-white rounded-[3rem] p-10 max-w-[360px] w-[90%] shadow-2xl relative text-center">
-            <button onClick={() => setShowApprovalPending(false)} className="absolute top-8 right-8 text-gray-300 hover:text-gray-500 transition-colors"><i className="fas fa-times text-xl"></i></button>
-            <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner"><i className="fas fa-user-clock text-orange-400 text-3xl"></i></div>
-            <h3 className="text-2xl font-black text-gray-900 mb-4">회원 전용 메뉴입니다</h3>
-            <p className="text-sm text-gray-500 font-medium leading-relaxed mb-8">
-              회원 이시면 로그인 해주세요<br/>
-              비회원 이시면 회원 가입 후 <span className="text-orange-500 font-bold">승인</span>되면<br/>
-              이용하실 수 있습니다
-            </p>
-            <button 
-              onClick={() => setShowApprovalPending(false)} 
-              className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-base shadow-xl hover:bg-black transition-all active:scale-95"
-            >
-              확인
-            </button>
-          </div>
-        </div>
-      )}
-
-</div>
+    </div>
   );
 };
 
