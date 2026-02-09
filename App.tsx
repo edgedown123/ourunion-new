@@ -423,8 +423,17 @@ const App: React.FC = () => {
     };
   }, []);
 
+  /**
+   * localStorage 저장은 환경/브라우저/데이터 크기(첨부파일 base64 등)에 따라
+   * QUOTA_EXCEEDED_ERR 등이 발생할 수 있습니다.
+   * 저장 실패가 화면 전환(게시글 클릭 등)을 막지 않도록 안전하게 감쌉니다.
+   */
   const saveToLocal = (key: string, data: any) => {
-    localStorage.setItem(`union_${key}`, JSON.stringify(data));
+    try {
+      localStorage.setItem(`union_${key}`, JSON.stringify(data));
+    } catch (e) {
+      console.warn(`[localStorage] union_${key} 저장 실패`, e);
+    }
   };
 
 const invalidateMembersCache = () => {
@@ -981,7 +990,6 @@ await cloud.deleteMemberFromCloud(user.id);
     setIsWriting(true);
     setSelectedPostId(null);
     pushNav({ tab: activeTab, postId: null, writing: true });
-    pushNav({ tab: activeTab, postId: null, writing: true });
   };
 
   const handleEditClick = (post: Post) => {
@@ -1004,10 +1012,15 @@ await cloud.deleteMemberFromCloud(user.id);
   const handleSelectPost = (id: string | null) => {
     setSelectedPostId(id);
     pushNav({ tab: activeTab, postId: id, writing: false });
-    if (id) {
+    if (!id) return;
+
+    // 조회수 증가 + 저장(localStorage/supabase)
+    // - localStorage 저장 실패(용량 초과 등)가 발생해도 UI(상세 진입)가 막히지 않도록 try/catch
+    try {
       const updatedPosts = posts.map(p => {
         if (p.id === id) {
           const updated = { ...p, views: (p.views || 0) + 1 };
+          // supabase 쪽은 내부에서 catch 처리함
           cloud.savePostToCloud(updated);
           return updated;
         }
@@ -1015,6 +1028,8 @@ await cloud.deleteMemberFromCloud(user.id);
       });
       setPosts(updatedPosts);
       saveToLocal('posts', updatedPosts);
+    } catch (e) {
+      console.warn('[handleSelectPost] 조회수 저장 실패(무시):', e);
     }
   };
 
