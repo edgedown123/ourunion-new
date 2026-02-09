@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { SiteSettings, Member, Post, BoardType } from '../types';
 
 interface AdminPanelProps {
@@ -42,6 +42,41 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [pushDebug, setPushDebug] = useState<any>(null);
   const [pushDbStatus, setPushDbStatus] = useState<any>(null);
   const [pushDebugLoading, setPushDebugLoading] = useState(false);
+
+  // 푸시: 알림 방지(조용한 시간) 설정
+  const [quietEnabled, setQuietEnabled] = useState(false);
+  const [quietStart, setQuietStart] = useState('22:00');
+  const [quietEnd, setQuietEnd] = useState('09:00');
+  const [quietLoading, setQuietLoading] = useState(false);
+  const [quietSaving, setQuietSaving] = useState(false);
+  const [quietError, setQuietError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      if (adminTab !== 'push') return;
+      setQuietError(null);
+      setQuietLoading(true);
+      try {
+        const isLocalAdmin = typeof window !== 'undefined' && localStorage.getItem('union_is_admin') === 'true';
+        const adminPin = isLocalAdmin ? '1229' : '';
+        const qs = adminPin ? `?adminPin=${encodeURIComponent(adminPin)}` : '';
+        const r = await fetch(`/api/push-quiet-hours${qs}`);
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j?.ok) {
+          throw new Error(j?.error || `설정을 불러오지 못했습니다. (${r.status})`);
+        }
+        const s = j?.settings || {};
+        setQuietEnabled(!!s.quiet_enabled);
+        setQuietStart(s.quiet_start || '22:00');
+        setQuietEnd(s.quiet_end || '09:00');
+      } catch (e:any) {
+        setQuietError(e?.message || String(e));
+      } finally {
+        setQuietLoading(false);
+      }
+    };
+    load();
+  }, [adminTab]);
 
   const [newYear, setNewYear] = useState('');
   const [newMonth, setNewMonth] = useState('');
@@ -909,6 +944,94 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 ※ 앱이 꺼져있을 때도 알림(진짜 웹 푸시)을 보내려면 VAPID 키 + 발송 함수(서버/Edge Function)가 필요합니다.
               </span>
             </p>
+
+            {/* 조용한 시간(알림 방지) 설정 */}
+            <div className="mb-6 rounded-2xl border bg-gray-50 p-5">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div>
+                  <div className="font-black text-gray-900">알림 방지 시간(조용한 시간)</div>
+                  <div className="text-sm text-gray-600 mt-1 leading-relaxed">
+                    설정한 시간대에는 새 게시글/가입/탈퇴 푸시가 발송되지 않습니다. (서버에서 차단)
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 font-black text-gray-800 select-none">
+                  <input
+                    type="checkbox"
+                    checked={quietEnabled}
+                    onChange={(e) => setQuietEnabled(e.target.checked)}
+                  />
+                  사용
+                </label>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                <div>
+                  <label className="block text-[11px] font-black text-gray-500 mb-1">시작</label>
+                  <input
+                    type="time"
+                    value={quietStart}
+                    onChange={(e) => setQuietStart(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border bg-white font-black"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-black text-gray-500 mb-1">끝</label>
+                  <input
+                    type="time"
+                    value={quietEnd}
+                    onChange={(e) => setQuietEnd(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border bg-white font-black"
+                  />
+                </div>
+                <button
+                  disabled={quietLoading || quietSaving}
+                  className="px-5 py-3 rounded-xl bg-slate-900 text-white font-black hover:bg-slate-800 transition disabled:opacity-60"
+                  onClick={async () => {
+                    setQuietError(null);
+                    setQuietSaving(true);
+                    try {
+                      const isLocalAdmin = typeof window !== 'undefined' && localStorage.getItem('union_is_admin') === 'true';
+                      const adminPin = isLocalAdmin ? '1229' : null;
+                      const r = await fetch('/api/push-quiet-hours', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          adminPin,
+                          quiet_enabled: quietEnabled,
+                          quiet_start: quietStart,
+                          quiet_end: quietEnd,
+                        }),
+                      });
+                      const j = await r.json().catch(() => ({}));
+                      if (!r.ok || !j?.ok) {
+                        throw new Error(j?.error || `저장 실패 (${r.status})`);
+                      }
+                      const s = j?.settings || {};
+                      // 서버 저장값으로 다시 동기화
+                      setQuietEnabled(!!s.quiet_enabled);
+                      setQuietStart(s.quiet_start || quietStart);
+                      setQuietEnd(s.quiet_end || quietEnd);
+                      alert('알림 방지 시간 설정이 저장되었습니다.');
+                    } catch (e:any) {
+                      setQuietError(e?.message || String(e));
+                      alert(`저장 실패: ${e?.message || String(e)}`);
+                    } finally {
+                      setQuietSaving(false);
+                    }
+                  }}
+                >
+                  {quietLoading ? '불러오는 중...' : quietSaving ? '저장 중...' : '저장'}
+                </button>
+              </div>
+
+              {quietError && (
+                <div className="mt-3 text-sm font-bold text-red-600">{quietError}</div>
+              )}
+
+              <div className="mt-3 text-xs text-gray-500 font-bold leading-relaxed">
+                ※ <span className="font-black">시작~끝</span>이 자정을 넘어가도 됩니다. 예) 22:00~09:00
+              </div>
+            </div>
 
             <div className="flex flex-col gap-3">
               <button

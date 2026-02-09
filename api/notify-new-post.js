@@ -14,6 +14,41 @@
  */
 import webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
+
+function getKstMinutes() {
+  try {
+    const dtf = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Seoul',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const parts = dtf.formatToParts(new Date());
+    const hh = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
+    const mm = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
+    return hh * 60 + mm;
+  } catch {
+    // fallback (server timezone)
+    const d = new Date();
+    return d.getHours() * 60 + d.getMinutes();
+  }
+}
+
+function timeStrToMinutes(t) {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(String(t || '').trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+function isInQuietHours(nowMin, startStr, endStr) {
+  const s = timeStrToMinutes(startStr);
+  const e = timeStrToMinutes(endStr);
+  if (s === null || e === null) return false;
+  if (s === e) return true; // 24h block
+  if (s < e) return nowMin >= s && nowMin < e;
+  // crosses midnight
+  return nowMin >= s || nowMin < e;
+}
 function getJsonBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
   if (!req.body) return null;
@@ -81,6 +116,35 @@ export default async function handler(req, res) {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
+
+    // -----------------------------
+    // Quiet hours (global) check
+    // -----------------------------
+    try {
+      const { data: qs } = await supabase
+        .from('push_settings')
+        .select('quiet_enabled, quiet_start, quiet_end')
+        .eq('id', 1)
+        .maybeSingle();
+
+      if (qs?.quiet_enabled) {
+        const now = getKstMinutes();
+        const start = qs.quiet_start || '22:00';
+        const end = qs.quiet_end || '09:00';
+        if (isInQuietHours(now, start, end)) {
+          return res.status(200).json({
+            ok: true,
+            skipped: true,
+            reason: 'quiet_hours',
+            quiet: { enabled: true, start, end },
+            board,
+            postId,
+          });
+        }
+      }
+    } catch {
+      // 설정 테이블이 없거나 읽기 실패해도 알림 발송은 계속 진행
+    }
 
     const table = PUSH_SUBSCRIPTIONS_TABLE || "push_subscriptions";
     const { data: subs, error } = await supabase.from(table).select("id, endpoint, p256dh, auth").limit(2000);

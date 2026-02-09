@@ -53,50 +53,9 @@ const Board: React.FC<BoardProps> = ({
     setFamilyEventPage(1);
   }, [type]);
   
-  const canManageComment = (author: string) =>
-    userRole === 'admin' || (userRole !== 'guest' && author === (currentUserName || ''));
+  const canManageComment = (author: string) => userRole === 'admin' || (userRole !== 'guest' && author === (currentUserName || ''));
 
-  // ==============================
-  // 페이징 계산 (⚠️ 훅은 항상 같은 순서로 실행되어야 함)
-  // - 상세 보기(selectedPost)가 떠도 아래 훅들은 항상 실행되어야 하므로
-  //   '상세 보기 return' 보다 위에 둡니다.
-  // ==============================
-
-  const filteredPosts = useMemo(
-    () =>
-      posts
-        .filter((p) => p.type === type)
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [posts, type]
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
-
-  // 게시글이 줄어들어 현재 페이지가 범위를 벗어나면 보정
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-
-  // 공지(듀얼) 보드 페이지 보정
-  useEffect(() => {
-    const nTotal = Math.max(
-      1,
-      Math.ceil(posts.filter((p) => p.type === 'notice_all').length / POSTS_PER_PAGE)
-    );
-    const fTotal = Math.max(
-      1,
-      Math.ceil(posts.filter((p) => p.type === 'family_events').length / POSTS_PER_PAGE)
-    );
-    if (noticeAllPage > nTotal) setNoticeAllPage(nTotal);
-    if (familyEventPage > fTotal) setFamilyEventPage(fTotal);
-  }, [posts, noticeAllPage, familyEventPage]);
-
-  const pagedPosts = filteredPosts.slice((page - 1) * POSTS_PER_PAGE, page * POSTS_PER_PAGE);
-
-  // 선택된 게시글 (상세 보기)
-  const selectedPost = selectedPostId
-    ? posts.find((p) => p.id === selectedPostId && p.type === type)
-    : null;
+  const selectedPost = selectedPostId ? posts.find(p => p.id === selectedPostId && p.type === type) : null;
 
   // 날짜 포맷팅 유틸리티 함수 (YYYY.MM.DD HH:mm)
   const formatDate = (dateStr: string | undefined) => {
@@ -747,6 +706,31 @@ const renderContentWithInlineImages = (raw: string) => {
       </div>
     );
   };
+
+  const filteredPosts = useMemo(
+    () => posts.filter(p => p.type === type).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [posts, type]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
+
+  // 게시글이 줄어들어 현재 페이지가 범위를 벗어나면 보정
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // 공지(듀얼) 보드 페이지 보정
+  useEffect(() => {
+    const nTotal = Math.max(1, Math.ceil(posts.filter(p => p.type === 'notice_all').length / POSTS_PER_PAGE));
+    const fTotal = Math.max(1, Math.ceil(posts.filter(p => p.type === 'family_events').length / POSTS_PER_PAGE));
+    if (noticeAllPage > nTotal) setNoticeAllPage(nTotal);
+    if (familyEventPage > fTotal) setFamilyEventPage(fTotal);
+  }, [posts, noticeAllPage, familyEventPage]);
+
+  const pagedPosts = useMemo(
+    () => filteredPosts.slice((page - 1) * POSTS_PER_PAGE, page * POSTS_PER_PAGE),
+    [filteredPosts, page]
+  );
 
   // 모바일에서 일부 게시판 목록을 더 촘촘하게(행 높이/여백 축소)
   // - 자유게시판/자료실
