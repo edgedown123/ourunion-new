@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Post, BoardType, UserRole, Comment } from '../types';
 import { NAV_ITEMS } from '../constants';
 
@@ -19,6 +19,15 @@ interface BoardProps {
   currentUserId?: string;
 }
 
+const POSTS_PER_PAGE = 7;
+
+const getPageNumbers = (page: number, totalPages: number): number[] => {
+  if (totalPages <= 3) return Array.from({ length: totalPages }, (_, i) => i + 1);
+  if (page <= 2) return [1, 2, 3];
+  if (page >= totalPages - 1) return [totalPages - 2, totalPages - 1, totalPages];
+  return [page - 1, page, page + 1];
+};
+
 const Board: React.FC<BoardProps> = ({ 
   type, posts, onWriteClick, onEditClick, selectedPostId, 
   onSelectPost, userRole, onDeletePost, onSaveComment, onEditComment, onDeleteComment, currentUserName, currentUserId 
@@ -28,9 +37,21 @@ const Board: React.FC<BoardProps> = ({
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
 
+  // 페이징
+  const [page, setPage] = useState(1);
+  const [noticeAllPage, setNoticeAllPage] = useState(1);
+  const [familyEventPage, setFamilyEventPage] = useState(1);
+
   const [commentMenuOpenId, setCommentMenuOpenId] = useState<string | null>(null);
   const [editingTarget, setEditingTarget] = useState<{ commentId: string; parentId?: string } | null>(null);
   const [editDraft, setEditDraft] = useState('');
+
+  // 게시판 전환 시 페이징 초기화
+  useEffect(() => {
+    setPage(1);
+    setNoticeAllPage(1);
+    setFamilyEventPage(1);
+  }, [type]);
   
   const canManageComment = (author: string) => userRole === 'admin' || (userRole !== 'guest' && author === (currentUserName || ''));
 
@@ -49,6 +70,57 @@ const Board: React.FC<BoardProps> = ({
     const min = String(date.getMinutes()).padStart(2, '0');
 
     return `${yyyy}.${mm}.${dd} ${hh}:${min}`;
+  };
+
+  const Pagination = ({
+    current,
+    total,
+    onChange,
+  }: {
+    current: number;
+    total: number;
+    onChange: (p: number) => void;
+  }) => {
+    const pageNumbers = useMemo(() => getPageNumbers(current, total), [current, total]);
+    if (total <= 1) return null;
+
+    const baseBtn =
+      'page-btn inline-flex items-center justify-center font-black rounded-xl border border-gray-200 bg-white text-gray-700 shadow-sm active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed';
+    // 모바일: 크게, 데스크톱: 조금 작게
+    const sizeClass = 'min-w-[48px] h-12 px-4 text-base md:min-w-[40px] md:h-10 md:px-3 md:text-sm';
+
+    return (
+      <div className="flex items-center justify-center gap-2 py-6">
+        <button
+          className={`${baseBtn} ${sizeClass}`}
+          onClick={() => onChange(Math.max(1, current - 1))}
+          disabled={current === 1}
+          aria-label="이전 페이지"
+        >
+          이전
+        </button>
+
+        {pageNumbers.map((n) => (
+          <button
+            key={n}
+            className={`${baseBtn} ${sizeClass} ${n === current ? 'border-sky-primary text-sky-primary' : ''}`}
+            onClick={() => onChange(n)}
+            aria-label={`${n} 페이지`}
+          >
+            {n}
+          </button>
+        ))}
+
+        <button
+          className={`${baseBtn} ${sizeClass}`}
+          onClick={() => onChange(Math.min(total, current + 1))}
+          disabled={current === total}
+          aria-label="다음 페이지"
+        >
+          다음
+        </button>
+      </div>
+    );
   };
   
   // 현재 보드 정보 찾기
@@ -552,10 +624,36 @@ const renderContentWithInlineImages = (raw: string) => {
 
   // 듀얼 보드 렌더링 함수
   const renderDualBoard = () => {
-    const noticeAllPosts = posts.filter(p => p.type === 'notice_all').sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
-    const familyEventPosts = posts.filter(p => p.type === 'family_events').sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
+    const noticeAllAll = posts
+      .filter(p => p.type === 'notice_all')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const familyEventAll = posts
+      .filter(p => p.type === 'family_events')
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    const PostList = ({ title, icon, colorClass, data }: { title: string, icon: string, colorClass: string, data: Post[] }) => (
+    const noticeAllTotalPages = Math.max(1, Math.ceil(noticeAllAll.length / POSTS_PER_PAGE));
+    const familyEventTotalPages = Math.max(1, Math.ceil(familyEventAll.length / POSTS_PER_PAGE));
+
+    const noticeAllPosts = noticeAllAll.slice((noticeAllPage - 1) * POSTS_PER_PAGE, noticeAllPage * POSTS_PER_PAGE);
+    const familyEventPosts = familyEventAll.slice((familyEventPage - 1) * POSTS_PER_PAGE, familyEventPage * POSTS_PER_PAGE);
+
+    const PostList = ({
+      title,
+      icon,
+      colorClass,
+      data,
+      current,
+      total,
+      onChange,
+    }: {
+      title: string;
+      icon: string;
+      colorClass: string;
+      data: Post[];
+      current: number;
+      total: number;
+      onChange: (p: number) => void;
+    }) => (
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full">
         <div className={`p-8 border-b border-gray-50 flex justify-between items-center ${colorClass}`}>
           <h3 className="text-xl font-black flex items-center">
@@ -581,18 +679,58 @@ const renderContentWithInlineImages = (raw: string) => {
             </ul>
           )}
         </div>
+        <Pagination current={current} total={total} onChange={onChange} />
       </div>
     );
 
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fadeIn">
-        <PostList title="공고/공지" icon="fa-bullhorn" colorClass="bg-sky-primary text-white" data={noticeAllPosts} />
-        <PostList title="경조사" icon="fa-bullhorn" colorClass="bg-sky-primary text-white" data={familyEventPosts} />
+        <PostList
+          title="공고/공지"
+          icon="fa-bullhorn"
+          colorClass="bg-sky-primary text-white"
+          data={noticeAllPosts}
+          current={noticeAllPage}
+          total={noticeAllTotalPages}
+          onChange={setNoticeAllPage}
+        />
+        <PostList
+          title="경조사"
+          icon="fa-bullhorn"
+          colorClass="bg-sky-primary text-white"
+          data={familyEventPosts}
+          current={familyEventPage}
+          total={familyEventTotalPages}
+          onChange={setFamilyEventPage}
+        />
       </div>
     );
   };
 
-  const filteredPosts = posts.filter(p => p.type === type).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const filteredPosts = useMemo(
+    () => posts.filter(p => p.type === type).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [posts, type]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
+
+  // 게시글이 줄어들어 현재 페이지가 범위를 벗어나면 보정
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // 공지(듀얼) 보드 페이지 보정
+  useEffect(() => {
+    const nTotal = Math.max(1, Math.ceil(posts.filter(p => p.type === 'notice_all').length / POSTS_PER_PAGE));
+    const fTotal = Math.max(1, Math.ceil(posts.filter(p => p.type === 'family_events').length / POSTS_PER_PAGE));
+    if (noticeAllPage > nTotal) setNoticeAllPage(nTotal);
+    if (familyEventPage > fTotal) setFamilyEventPage(fTotal);
+  }, [posts, noticeAllPage, familyEventPage]);
+
+  const pagedPosts = useMemo(
+    () => filteredPosts.slice((page - 1) * POSTS_PER_PAGE, page * POSTS_PER_PAGE),
+    [filteredPosts, page]
+  );
 
   // 모바일에서 일부 게시판 목록을 더 촘촘하게(행 높이/여백 축소)
   // - 자유게시판/자료실
@@ -631,7 +769,7 @@ const renderContentWithInlineImages = (raw: string) => {
             {filteredPosts.length === 0 ? (
               <li className="px-6 py-40 text-center text-gray-300 font-bold italic text-lg">작성된 게시글이 없습니다.</li>
             ) : (
-              filteredPosts.map((post) => (
+              pagedPosts.map((post) => (
                 <li key={post.id}>
                   <button
                     onClick={() => onSelectPost(post.id)}
@@ -660,6 +798,7 @@ const renderContentWithInlineImages = (raw: string) => {
               ))
             )}
           </ul>
+          <Pagination current={page} total={totalPages} onChange={setPage} />
         </div>
       )}
     </div>
