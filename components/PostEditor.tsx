@@ -1,7 +1,6 @@
 
 import React, { useState, useRef, useEffect  } from 'react';
 import { BoardType, PostAttachment, Post } from '../types';
-import RichTextEditor from './RichTextEditor';
 interface PostEditorProps {
   type: BoardType;
   initialPost?: Post | null;
@@ -12,45 +11,15 @@ interface PostEditorProps {
 const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCancel }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const editorRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLTextAreaElement | null>(null);
   const [postPassword, setPostPassword] = useState('');
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [attachmentsOpen, setAttachmentsOpen] = useState(true);
-  const [editorOpen, setEditorOpen] = useState(true);
-
-  useEffect(() => {
-    // 모바일에서는 화면이 길어지므로 기본을 접힌 상태로
-    if (typeof window !== 'undefined') {
-      const isMobile = window.innerWidth < 640;
-      setAttachmentsOpen(!isMobile);
-      setEditorOpen(!isMobile);
-    }
-  }, []);
-
-
-  const escapeHtml = (s: string) =>
-    s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
-  const plainToHtml = (s: string) => escapeHtml(s).replace(/\n/g, '<br/>');
-
-  const normalizeToHtml = (s: string) => {
-    const str = s ?? '';
-    // If it already looks like HTML (contains tags), keep it as-is
-    if (/<\/?[a-z][\s\S]*>/i.test(str)) return str;
-    return plainToHtml(str);
-  };
-
   useEffect(() => {
     if (initialPost) {
       setTitle(initialPost.title);
-      setContent(normalizeToHtml(initialPost.content));
+      setContent(initialPost.content);
       setPostPassword(initialPost.password || '');
       setAttachments(initialPost.attachments || []);
     }
@@ -170,7 +139,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           const next = [...prev, { name: file.name, data: fileData, type: file.type }];
 
           // 글쓰기 textarea가 마운트된 경우에만 커서 위치에 토큰 삽입
-          if (imageIndex >= 0) {
+          if (imageIndex >= 0 && contentRef.current) {
             insertImageTokenAtCursor(`[[img:${imageIndex}]]`);
           }
           return next;
@@ -190,40 +159,32 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   };
 
 
-    const insertImageTokenAtCursor = (token: string) => {
-    const el = editorRef.current;
+  const insertImageTokenAtCursor = (token: string) => {
+    const ta = contentRef.current;
+    setContent(prev => {
+      // textarea가 아직 없으면 맨 아래에 추가
+      if (!ta) return prev ? `${prev}\n${token}\n` : `${token}\n`;
 
-    // Prefer inserting at caret inside the rich editor.
-    if (el) {
-      el.focus();
-      const html = `<br/>${token}<br/>`;
-      let ok = false;
-      try {
-        // @ts-ignore
-        ok = document.execCommand('insertHTML', false, html);
-      } catch {}
+      const start = ta.selectionStart ?? prev.length;
+      const end = ta.selectionEnd ?? prev.length;
 
-      if (!ok) {
-        const sel = window.getSelection();
-        if (sel && sel.rangeCount > 0) {
-          const range = sel.getRangeAt(0);
-          range.deleteContents();
-          const frag = range.createContextualFragment(html);
-          range.insertNode(frag);
-          range.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(range);
-        } else {
-          el.innerHTML += html;
-        }
-      }
+      const prefix = prev.slice(0, start);
+      const suffix = prev.slice(end);
 
-      setContent(el.innerHTML);
-      return;
-    }
+      const before = prefix && !prefix.endsWith('\n') ? prefix + '\n' : prefix;
+      const after = suffix && !suffix.startsWith('\n') ? '\n' + suffix : suffix;
+      const next = `${before}${token}${after}`;
 
-    // Fallback: append to end (should be rare)
-    setContent(prev => (prev ? `${prev}<br/>${token}<br/>` : `${token}<br/>`));
+      requestAnimationFrame(() => {
+        try {
+          const pos = before.length + token.length + (after.startsWith('\n') ? 1 : 0);
+          ta.focus();
+          ta.setSelectionRange(pos, pos);
+        } catch {}
+      });
+
+      return next;
+    });
   };
 
   return (
@@ -253,162 +214,73 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           />
         </div>
 
-        
-        <div className="bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setAttachmentsOpen(v => !v)}
-            className="w-full flex items-center justify-between p-4"
-            aria-label="첨부파일 접기/펼치기"
-          >
-            <div className="text-left">
-              <div className="text-sm font-bold text-gray-700">
-                <i className="fas fa-paperclip mr-2"></i> 첨부파일
-                <span className="text-gray-400 font-medium ml-2 text-xs">
-                  (현재 {attachments.length}/{MAX_TOTAL_FILES})
-                </span>
-              </div>
-              <div className="text-[11px] text-gray-500 mt-1">
-                사진 최대 {MAX_IMAGE_FILES}개 · 문서 최대 {MAX_DOC_FILES}개 · 총 {MAX_TOTAL_FILES}개 · 파일당 {formatFileSize(MAX_FILE_SIZE)} · 총합 {formatFileSize(MAX_TOTAL_SIZE)}
-              </div>
-            </div>
-            <div className="text-gray-400 font-bold text-sm">{attachmentsOpen ? "▲" : "▼"}</div>
-          </button>
-
-          <div
-            className={[
-              "transition-[max-height] duration-300 ease-in-out overflow-hidden",
-              attachmentsOpen ? "max-h-[1600px]" : "max-h-0",
-            ].join(" ")}
-          >
-            <div className="p-4 pt-0">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-                multiple
-                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.hwp"
-              />
-              <div className="space-y-2 mb-3">
-                {attachments.map((file, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between bg-white p-3 rounded-lg border shadow-sm"
-                  >
-                    <div className="flex items-center">
-                      {file.type?.startsWith("image/") ? (
-                        <img
-                          src={file.data}
-                          alt="preview"
-                          className="w-10 h-10 object-cover rounded mr-3"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center mr-3">
-                          <i
-                            className={`fas ${
-                              file.type?.startsWith("video/")
-                                ? "fa-video"
-                                : "fa-file"
-                            } text-gray-400`}
-                          ></i>
-                        </div>
-                      )}
-                      <div className="text-xs">
-                        <p className="font-medium text-gray-800 truncate max-w-[200px]">
-                          {file.name}
-                        </p>
-                        <p className="text-gray-400">
-                          {(file.data.length * 0.75 / 1024).toFixed(1)} KB{" "}
-                          {file.type?.startsWith("image/") && (
-                            <span className="text-emerald-500 font-bold ml-1">
-                              (최적화됨)
-                            </span>
-                          )}
-                        </p>
-                      </div>
+        <div className="bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-200">
+          <label className="block text-sm font-bold text-gray-700 mb-2">
+            <i className="fas fa-paperclip mr-2"></i> 첨부파일 (사진 최대 5개 / 문서 최대 3개 / 총 8개)
+          </label>
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            className="hidden"
+            multiple
+            accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.hwp"
+          />
+          <div className="space-y-2 mb-3">
+            {attachments.map((file, idx) => (
+              <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-lg border shadow-sm">
+                <div className="flex items-center">
+                  {file.type?.startsWith('image/') ? (
+                    <img src={file.data} alt="preview" className="w-10 h-10 object-cover rounded mr-3" />
+                  ) : (
+                    <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center mr-3">
+                      <i className={`fas ${file.type?.startsWith('video/') ? 'fa-video' : 'fa-file'} text-gray-400`}></i>
                     </div>
-                    <button
-                      onClick={() => removeAttachment(idx)}
-                      className="text-red-400 hover:text-red-600 p-2 transition-colors"
-                    >
-                      <i className="fas fa-times"></i>
-                    </button>
+                  )}
+                  <div className="text-xs">
+                    <p className="font-medium text-gray-800 truncate max-w-[200px]">{file.name}</p>
+                    <p className="text-gray-400">{(file.data.length * 0.75 / 1024).toFixed(1)} KB {file.type?.startsWith('image/') && <span className="text-emerald-500 font-bold ml-1">(최적화됨)</span>}</p>
                   </div>
-                ))}
-              </div>
-
-              {attachments.length < MAX_TOTAL_FILES ? (
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-6 text-gray-400 text-sm hover:text-sky-primary hover:bg-white transition-all rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center"
-                >
-                  <i className="fas fa-plus-circle text-2xl mb-2"></i>
-                  <span>
-                    클릭하여 파일을 추가하세요 (현재 {attachments.length}/{MAX_TOTAL_FILES} · 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES})
-                  </span>
-                  <span className="text-[10px] mt-1 text-sky-600 font-bold">
-                    파일당 최대 {formatFileSize(MAX_FILE_SIZE)} · 총합 최대 {formatFileSize(MAX_TOTAL_SIZE)}
-                  </span>
-                </button>
-              ) : (
-                <p className="text-center text-xs text-orange-500 font-medium py-2">
-                  최대 파일 개수에 도달했습니다.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
-
-        
-        <div className="rounded-xl border border-gray-200 overflow-hidden">
-          <button
-            type="button"
-            onClick={() => setEditorOpen(v => !v)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-white"
-            aria-label="글쓰기 에디터 접기/펼치기"
-          >
-            <div className="text-left">
-              <div className="text-sm font-medium text-gray-700">내용</div>
-              {!editorOpen && (
-                <div className="text-[11px] text-gray-500 mt-0.5">
-                  탭하면 에디터가 펼쳐집니다
                 </div>
-              )}
-            </div>
-            <div className="text-gray-400 font-bold text-sm">{editorOpen ? "▲" : "▼"}</div>
-          </button>
-
-          <div
-            className={[
-              "transition-[max-height] duration-300 ease-in-out overflow-hidden bg-white",
-              editorOpen ? "max-h-[2200px]" : "max-h-0",
-            ].join(" ")}
-          >
-            <div className="p-4 pt-0">
-              <RichTextEditor
-                ref={editorRef}
-                value={content}
-                onChange={setContent}
-                placeholder="내용을 입력하세요."
-                minHeightClassName="min-h-[260px]"
-                collapsibleToolbar={true}
-              />
-              <p className="mt-2 text-[11px] text-gray-500 leading-relaxed">
-                * 글자 크기 / 굵기 / 기울기 / 밑줄 / 가운데줄 / 색상 변경만 지원합니다. (이미지 첨부는 기존 방식 그대로)
-              </p>
-            </div>
+                <button onClick={() => removeAttachment(idx)} className="text-red-400 hover:text-red-600 p-2 transition-colors">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+            ))}
           </div>
+          {attachments.length < MAX_TOTAL_FILES ? (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-6 text-gray-400 text-sm hover:text-sky-primary hover:bg-white transition-all rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center"
+            >
+              <i className="fas fa-plus-circle text-2xl mb-2"></i>
+              <span>
+                클릭하여 파일을 추가하세요 (현재 {attachments.length}/{MAX_TOTAL_FILES} · 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES})
+              </span>
+              <span className="text-[10px] mt-1 text-sky-600 font-bold">
+                파일당 최대 {formatFileSize(MAX_FILE_SIZE)} · 총합 최대 {formatFileSize(MAX_TOTAL_SIZE)}
+              </span>
+            </button>
+          ) : (
+            <p className="text-center text-xs text-orange-500 font-medium py-2">최대 파일 개수에 도달했습니다.</p>
+          )}
         </div>
 
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
+          <textarea
+            ref={contentRef}
+            className="w-full border-gray-300 rounded-lg p-3 h-64 border focus:ring-sky-500 outline-none resize-none leading-relaxed"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          ></textarea>
+        </div>
 
         <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
             onClick={() => onSave(title, content, attachments, postPassword, initialPost?.id)}
-            disabled={!title || !content || content === '<br>' || content === '<div><br></div>' || !postPassword}
+            disabled={!title || !content || !postPassword}
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {initialPost ? '수정 완료' : '게시하기'}

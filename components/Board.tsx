@@ -169,33 +169,6 @@ const Board: React.FC<BoardProps> = ({
     };
 
 
-const sanitizeHtml = (rawHtml: string) => {
-      if (!rawHtml) return '';
-      // strip scripts
-      let s = rawHtml.replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '');
-      // strip event handlers (onclick=...)
-      s = s.replace(/\son\w+=(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-      // prevent javascript: urls
-      s = s.replace(/href=(["'])\s*javascript:[^"']*\1/gi, 'href="#"');
-      return s;
-    };
-
-    const linkifyHtmlString = (rawHtml: string) => {
-      if (!rawHtml) return '';
-      // If already contains anchors, we still try to linkify other URLs.
-      // Avoid matching inside tags/attributes by stopping at '<' and using a conservative regex.
-      const urlRegex = /(?<!href=["'])(https?:\/\/[^\s<]+|www\.[^\s<]+)/g;
-      return rawHtml.replace(urlRegex, (m) => {
-        const href = m.startsWith('http') ? m : `https://${m}`;
-        // Trim common trailing punctuation without losing it visually
-        const match = m.match(/^(.*?)([)\].,!?}]+)?$/);
-        const url = match?.[1] ?? m;
-        const tail = match?.[2] ?? '';
-        const safeUrl = url.replace(/"/g, '%22');
-        return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="underline break-all hover:text-sky-700">${safeUrl}</a>${tail}`;
-      });
-    };
-
 const renderContentWithInlineImages = (raw: string) => {
   const parts = raw.split(/\[\[img:(\d+)\]\]/g);
   const used = new Set<number>();
@@ -206,9 +179,7 @@ const renderContentWithInlineImages = (raw: string) => {
       if (parts[i]) {
         nodes.push(
           <span key={`t-${i}`} className="whitespace-pre-wrap break-words">
-            {/<\/?.+?>/i.test(parts[i])
-              ? <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(linkifyHtmlString(parts[i])) }} />
-              : linkifyText(parts[i])}
+            {linkifyText(parts[i])}
           </span>
         );
       }
