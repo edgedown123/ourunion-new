@@ -10,10 +10,12 @@ interface NoticeSingleProps {
   onWriteClick: (specificType?: BoardType) => void;
   onEditClick: (post: Post) => void;
   onSelectPost: (id: string | null) => void;
-  onDeletePost: (postId: string, inputPassword?: string) => void;
+  onDeletePost: (postId: string) => void;
   onSaveComment: (postId: string, content: string, parentId?: string) => void;
   onEditComment: (post: string, commentId: string, content: string, parentId?: string) => void;
   onDeleteComment: (post: string, commentId: string, parentId?: string) => void;
+  currentUserName?: string;
+  currentUserId?: string;
 }
 
 const NoticeSingle: React.FC<NoticeSingleProps> = ({
@@ -28,6 +30,8 @@ const NoticeSingle: React.FC<NoticeSingleProps> = ({
   onSaveComment,
   onEditComment,
   onDeleteComment,
+  currentUserName,
+  currentUserId,
 }) => {
   return (
     <div className="scroll-mt-24">
@@ -49,6 +53,8 @@ const NoticeSingle: React.FC<NoticeSingleProps> = ({
         onSaveComment={onSaveComment}
         onEditComment={onEditComment}
         onDeleteComment={onDeleteComment}
+        currentUserName={currentUserName}
+        currentUserId={currentUserId}
       />
     </div>
   );

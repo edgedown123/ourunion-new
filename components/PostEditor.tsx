@@ -4,7 +4,7 @@ import { BoardType, PostAttachment, Post } from '../types';
 interface PostEditorProps {
   type: BoardType;
   initialPost?: Post | null;
-  onSave: (title: string, content: string, attachments?: PostAttachment[], password?: string, id?: string) => void;
+  onSave: (title: string, content: string, attachments?: PostAttachment[], id?: string) => void;
   onCancel: () => void;
 }
 
@@ -12,7 +12,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
-  const [postPassword, setPostPassword] = useState('');
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -20,7 +19,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     if (initialPost) {
       setTitle(initialPost.title);
       setContent(initialPost.content);
-      setPostPassword(initialPost.password || '');
       setAttachments(initialPost.attachments || []);
     }
   }, [initialPost]);
@@ -201,19 +199,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
-            수정/삭제용 비밀번호 <span className="text-[10px] text-sky-primary ml-2">* 모든 게시물에 필수로 입력해야 합니다.</span>
-          </label>
-          <input
-            type="password"
-            className="w-full sm:w-64 border-gray-300 rounded-lg p-3 border focus:ring-sky-500 outline-none"
-            placeholder="4자리 이상 입력"
-            value={postPassword}
-            onChange={(e) => setPostPassword(e.target.value)}
-          />
-        </div>
-
         <div className="bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-200">
           <label className="block text-sm font-bold text-gray-700 mb-2">
             <i className="fas fa-paperclip mr-2"></i> 첨부파일 (사진 최대 5개 / 문서 최대 3개 / 총 8개)
@@ -279,8 +264,8 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
         <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
-            onClick={() => onSave(title, content, attachments, postPassword, initialPost?.id)}
-            disabled={!title || !content || !postPassword}
+            onClick={() => onSave(title, content, attachments, initialPost?.id)}
+            disabled={!title || !content}
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {initialPost ? '수정 완료' : '게시하기'}

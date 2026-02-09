@@ -11,11 +11,13 @@ interface NoticeCombinedProps {
   onWriteClick: (specificType?: BoardType) => void;
   onEditClick: (post: Post) => void;
   onSelectPost: (id: string | null) => void;
-  onDeletePost: (postId: string, inputPassword?: string) => void;
+  onDeletePost: (postId: string) => void;
 
   onSaveComment: (postId: string, content: string, parentId?: string) => void;
   onEditComment: (postId: string, commentId: string, content: string, parentId?: string) => void;
   onDeleteComment: (postId: string, commentId: string, parentId?: string) => void;
+  currentUserName?: string;
+  currentUserId?: string;
 }
 
 const NoticeCombined: React.FC<NoticeCombinedProps> = ({
@@ -30,6 +32,8 @@ const NoticeCombined: React.FC<NoticeCombinedProps> = ({
   onSaveComment,
   onEditComment,
   onDeleteComment,
+  currentUserName,
+  currentUserId,
 }) => {
   const generalRef = useRef<HTMLDivElement | null>(null);
   const familyRef = useRef<HTMLDivElement | null>(null);
@@ -62,6 +66,8 @@ const NoticeCombined: React.FC<NoticeCombinedProps> = ({
               onSaveComment={onSaveComment}
               onEditComment={onEditComment}
               onDeleteComment={onDeleteComment}
+              currentUserName={currentUserName}
+              currentUserId={currentUserId}
             />
           </div>
         </div>
@@ -81,6 +87,8 @@ const NoticeCombined: React.FC<NoticeCombinedProps> = ({
               onSaveComment={onSaveComment}
               onEditComment={onEditComment}
               onDeleteComment={onDeleteComment}
+              currentUserName={currentUserName}
+              currentUserId={currentUserId}
             />
           </div>
         </div>

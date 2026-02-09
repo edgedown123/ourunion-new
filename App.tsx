@@ -461,22 +461,25 @@ const invalidateMembersCache = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSavePost = async (title: string, content: string, attachments?: PostAttachment[], postPassword?: string, id?: string) => {
+  const handleSavePost = async (title: string, content: string, attachments?: PostAttachment[], id?: string) => {
     let targetPost: Post;
     if (id) {
       const existing = posts.find(p => p.id === id);
-      targetPost = { ...existing!, title, content, attachments, password: postPassword };
+      // 수정 시 작성자 정보는 유지(레거시 호환)
+      targetPost = { ...existing!, title, content, attachments };
     } else {
+      const authorName = userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원');
+      const authorId = userRole === 'admin' ? 'admin' : (loggedInMember?.id || undefined);
       targetPost = {
         id: Date.now().toString(),
         type: ((writingType || (activeTab === 'notice' ? 'notice_all' : activeTab)) as BoardType),
         title,
         content,
-        author: userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원'),
+        author: authorName,
+        authorId,
         createdAt: new Date().toISOString(),
         views: 0,
         attachments: attachments,
-        password: postPassword,
         comments: []
       };
     }
@@ -587,12 +590,18 @@ const invalidateMembersCache = () => {
     saveToLocal('posts', updatedPosts);
   };
 
-  const handleDeletePost = async (postId: string, inputPassword?: string) => {
+  const handleDeletePost = async (postId: string) => {
     const postToDelete = posts.find(p => p.id === postId);
     if (!postToDelete) return;
-    
-    if (userRole !== 'admin' && postToDelete.password && inputPassword !== postToDelete.password) {
-      return alert('비밀번호가 일치하지 않습니다.');
+
+    // ✅ 권한: 관리자 또는 작성자(조합원 본인)
+    const isAuthor = userRole !== 'guest' && (
+      (postToDelete.authorId && loggedInMember?.id && postToDelete.authorId === loggedInMember.id) ||
+      (!postToDelete.authorId && (postToDelete.author === (loggedInMember?.name || '')))
+    );
+    if (userRole !== 'admin' && !isAuthor) {
+      alert('작성자만 삭제할 수 있습니다.');
+      return;
     }
     
     if (!window.confirm('정말 삭제하시겠습니까?')) return;
@@ -976,6 +985,15 @@ await cloud.deleteMemberFromCloud(user.id);
   };
 
   const handleEditClick = (post: Post) => {
+    // ✅ 권한: 관리자 또는 작성자(조합원 본인)
+    const isAuthor = userRole !== 'guest' && (
+      (post.authorId && loggedInMember?.id && post.authorId === loggedInMember.id) ||
+      (!post.authorId && (post.author === (loggedInMember?.name || '')))
+    );
+    if (userRole !== 'admin' && !isAuthor) {
+      alert('작성자만 수정할 수 있습니다.');
+      return;
+    }
     setEditingPost(post);
     setWritingType(post.type);
     setIsWriting(true);
@@ -1126,6 +1144,8 @@ await cloud.deleteMemberFromCloud(user.id);
                 onSaveComment={handleSaveComment}
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
+                currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')}
+                currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
               />
             </div>
           </>
@@ -1145,6 +1165,8 @@ await cloud.deleteMemberFromCloud(user.id);
                 onSaveComment={handleSaveComment}
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
+                currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')}
+                currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
               />
             </div>
 
@@ -1162,6 +1184,8 @@ await cloud.deleteMemberFromCloud(user.id);
                 onSaveComment={handleSaveComment}
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
+                currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')}
+                currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
               />
             </div>
           </>
@@ -1180,6 +1204,7 @@ await cloud.deleteMemberFromCloud(user.id);
               onEditComment={handleEditComment}
               onDeleteComment={handleDeleteComment}
               currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')} 
+              currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
             />
           </div>
         )}

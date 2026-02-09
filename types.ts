@@ -22,11 +22,14 @@ export interface Post {
   title: string;
   content: string;
   author: string;
+  /** 작성자 식별자(조합원: member.id, 관리자: 'admin'). 기존 게시물 호환을 위해 optional */
+  authorId?: string;
   createdAt: string;
   views: number;
   imageUrl?: string;
   attachments?: PostAttachment[];
-  password?: string; // 자유게시판 삭제용 비번
+  /** (레거시) 게시물 수정/삭제 비밀번호 - 신규 작성에서는 사용하지 않음 */
+  password?: string;
   comments?: Comment[]; // 댓글 목록
 }
 

@@ -11,20 +11,19 @@ interface BoardProps {
   selectedPostId: string | null;
   onSelectPost: (id: string | null) => void;
   userRole: UserRole;
-  onDeletePost?: (id: string, password?: string) => void;
+  onDeletePost?: (id: string) => void;
   onSaveComment?: (postId: string, content: string, parentId?: string) => void;
   onEditComment?: (postId: string, commentId: string, content: string, parentId?: string) => void;
   onDeleteComment?: (postId: string, commentId: string, parentId?: string) => void;
   currentUserName?: string;
+  currentUserId?: string;
 }
 
 const Board: React.FC<BoardProps> = ({ 
   type, posts, onWriteClick, onEditClick, selectedPostId, 
-  onSelectPost, userRole, onDeletePost, onSaveComment, onEditComment, onDeleteComment, currentUserName 
+  onSelectPost, userRole, onDeletePost, onSaveComment, onEditComment, onDeleteComment, currentUserName, currentUserId 
 }) => {
-  const [isDeleteMode, setIsDeleteMode] = useState(false);
-  const [isEditVerifyMode, setIsEditVerifyMode] = useState(false);
-  const [verifyPassword, setVerifyPassword] = useState('');
+  const [postMenuOpen, setPostMenuOpen] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
@@ -64,40 +63,34 @@ const Board: React.FC<BoardProps> = ({
     }
   }
 
-  const handleEditAttempt = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!selectedPost) return;
-
-    setIsEditVerifyMode(true);
-    setIsDeleteMode(false);
-    setVerifyPassword('');
+  const canManagePost = (post: Post) => {
+    if (userRole === 'admin') return true;
+    if (userRole === 'guest') return false;
+    // authorId 우선, 없으면 author 이름으로 레거시 호환
+    if (post.authorId && currentUserId) return post.authorId === currentUserId;
+    return post.author === (currentUserName || '');
   };
 
-  const handleDeleteAttempt = (e: React.MouseEvent) => {
+  const handleEditPost = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!selectedPost || !onDeletePost) return;
-
-    setIsDeleteMode(true);
-    setIsEditVerifyMode(false);
-    setVerifyPassword('');
-  };
-
-  const handleConfirmVerify = () => {
     if (!selectedPost) return;
-    // ✅ 관리자 포함: 수정/삭제 시에는 항상 게시물 비밀번호 확인
-    if (verifyPassword !== selectedPost.password) {
-      alert('비밀번호가 일치하지 않습니다.');
+    if (!canManagePost(selectedPost)) {
+      alert('작성자만 수정할 수 있습니다.');
       return;
     }
+    setPostMenuOpen(false);
+    onEditClick(selectedPost);
+  };
 
-    if (isEditVerifyMode) {
-      onEditClick(selectedPost);
-      setIsEditVerifyMode(false);
-    } else if (isDeleteMode) {
-      onDeletePost?.(selectedPost.id, verifyPassword);
-      setIsDeleteMode(false);
+  const handleDeletePost = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedPost || !onDeletePost) return;
+    if (!canManagePost(selectedPost)) {
+      alert('작성자만 삭제할 수 있습니다.');
+      return;
     }
-    setVerifyPassword('');
+    setPostMenuOpen(false);
+    onDeletePost(selectedPost.id);
   };
 
   const handleCommentSubmit = (e: React.FormEvent) => {
@@ -208,7 +201,6 @@ const renderContentWithInlineImages = (raw: string) => {
 
   return { nodes, used };
 };
-    const hasPassword = !!selectedPost.password;
     const isNoticeCategory = selectedPost.type === 'notice_all' || selectedPost.type === 'family_events';
 
     return (
@@ -218,48 +210,40 @@ const renderContentWithInlineImages = (raw: string) => {
             <i className="fas fa-arrow-left mr-2 group-hover:-translate-x-1 transition-transform"></i> 목록으로
           </button>
           
-          <div className="flex space-x-2">
-            {(userRole === 'admin' || (hasPassword && !isDeleteMode && !isEditVerifyMode)) && (
-              <>
-                <button 
-                  onClick={handleEditAttempt} 
-                  className="flex items-center font-black text-xs px-5 py-3 rounded-2xl bg-sky-50 text-sky-600 hover:bg-sky-100 transition-all shadow-md active:scale-95 border border-sky-100"
+          {canManagePost(selectedPost) && (
+            <div className="relative">
+              <button
+                onClick={() => setPostMenuOpen(v => !v)}
+                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 active:scale-95 transition-all"
+                aria-label="게시물 메뉴"
+              >
+                <i className="fas fa-ellipsis-v text-gray-500"></i>
+              </button>
+
+              {postMenuOpen && (
+                <div
+                  className="absolute right-0 mt-2 w-44 bg-white rounded-2xl border shadow-xl overflow-hidden z-20"
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <i className="fas fa-edit mr-2"></i> 수정
-                </button>
-                <button 
-                  onClick={handleDeleteAttempt} 
-                  className="flex items-center font-black text-xs px-5 py-3 rounded-2xl bg-red-50 text-red-600 hover:bg-red-100 transition-all shadow-md active:scale-95 border border-red-100"
-                >
-                  <i className="fas fa-trash-alt mr-2"></i> 삭제
-                </button>
-              </>
-            )}
-          </div>
+                  <button
+                    onClick={handleEditPost}
+                    className="w-full text-left px-4 py-3 text-sm font-bold hover:bg-gray-50"
+                  >
+                    <i className="fas fa-edit mr-2 text-sky-primary"></i> 글 수정
+                  </button>
+                  <button
+                    onClick={handleDeletePost}
+                    className="w-full text-left px-4 py-3 text-sm font-bold hover:bg-red-50 text-red-600"
+                  >
+                    <i className="fas fa-trash-alt mr-2"></i> 삭제하기
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <article className="bg-white rounded-[2.5rem] border p-10 md:p-14 shadow-sm relative overflow-hidden mb-10">
-          {(isDeleteMode || isEditVerifyMode) && (
-            <div className="absolute inset-0 z-10 bg-white/95 backdrop-blur-md flex items-center justify-center p-8">
-              <div className="max-w-xs w-full text-center">
-                <i className={`fas ${isEditVerifyMode ? 'fa-key' : 'fa-lock'} text-5xl ${isEditVerifyMode ? 'text-sky-500' : 'text-red-500'} mb-5`}></i>
-                <h4 className="text-xl font-black mb-4">{isEditVerifyMode ? '수정 비밀번호' : '삭제 비밀번호'}</h4>
-                <input 
-                  type="password" 
-                  value={verifyPassword} 
-                  onChange={(e) => setVerifyPassword(e.target.value)} 
-                  className={`w-full border-2 rounded-2xl p-4 mb-6 text-center text-xl tracking-widest outline-none focus:border-opacity-100 ${isEditVerifyMode ? 'border-sky-100 focus:border-sky-500' : 'border-red-100 focus:border-red-500'}`} 
-                  placeholder="****" 
-                  autoFocus 
-                  onKeyDown={(e) => e.key === 'Enter' && handleConfirmVerify()}
-                />
-                <div className="flex space-x-3">
-                  <button onClick={() => { setIsDeleteMode(false); setIsEditVerifyMode(false); }} className="flex-1 py-4 bg-gray-100 rounded-2xl text-sm font-black">취소</button>
-                  <button onClick={handleConfirmVerify} className={`flex-1 py-4 text-white rounded-2xl text-sm font-black shadow-lg ${isEditVerifyMode ? 'bg-sky-500' : 'bg-red-500'}`}>확인</button>
-                </div>
-              </div>
-            </div>
-          )}
 
           <header className="mb-12">
             {isNoticeCategory && (
