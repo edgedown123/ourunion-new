@@ -423,16 +423,13 @@ const App: React.FC = () => {
     };
   }, []);
 
-  /**
-   * localStorage 저장은 환경/브라우저/데이터 크기(첨부파일 base64 등)에 따라
-   * QUOTA_EXCEEDED_ERR 등이 발생할 수 있습니다.
-   * 저장 실패가 화면 전환(게시글 클릭 등)을 막지 않도록 안전하게 감쌉니다.
-   */
+  // localStorage 저장은 브라우저/기기(특히 iOS PWA)에서 용량 제한(Quota) 등으로 예외가 날 수 있습니다.
+  // 예외가 나면 React가 그대로 크래시(하얀 화면)할 수 있으므로 반드시 안전하게 처리합니다.
   const saveToLocal = (key: string, data: any) => {
     try {
       localStorage.setItem(`union_${key}`, JSON.stringify(data));
     } catch (e) {
-      console.warn(`[localStorage] union_${key} 저장 실패`, e);
+      console.warn(`[localStorage] save failed: union_${key}`, e);
     }
   };
 
@@ -1012,24 +1009,26 @@ await cloud.deleteMemberFromCloud(user.id);
   const handleSelectPost = (id: string | null) => {
     setSelectedPostId(id);
     pushNav({ tab: activeTab, postId: id, writing: false });
-    if (!id) return;
-
-    // 조회수 증가 + 저장(localStorage/supabase)
-    // - localStorage 저장 실패(용량 초과 등)가 발생해도 UI(상세 진입)가 막히지 않도록 try/catch
-    try {
+    if (id) {
       const updatedPosts = posts.map(p => {
         if (p.id === id) {
           const updated = { ...p, views: (p.views || 0) + 1 };
-          // supabase 쪽은 내부에서 catch 처리함
-          cloud.savePostToCloud(updated);
+          // 조회수 증가는 UX를 막지 않도록 "비동기 + 실패 무시" 처리
+          try {
+            cloud.savePostToCloud(updated);
+          } catch (e) {
+            console.warn('savePostToCloud failed (ignored):', e);
+          }
           return updated;
         }
         return p;
       });
       setPosts(updatedPosts);
-      saveToLocal('posts', updatedPosts);
-    } catch (e) {
-      console.warn('[handleSelectPost] 조회수 저장 실패(무시):', e);
+      // Supabase를 쓰는 경우엔 로컬에 전체 posts를 계속 덮어쓰다 보면(첨부 이미지 등)
+      // localStorage 용량 초과로 앱이 크래시할 수 있어, 조회수 증가에서는 저장을 생략합니다.
+      if (!cloud.isSupabaseEnabled()) {
+        saveToLocal('posts', updatedPosts);
+      }
     }
   };
 
