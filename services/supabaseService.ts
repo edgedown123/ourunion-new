@@ -113,6 +113,8 @@ export const fetchPostsFromCloud = async (): Promise<Post[] | null> => {
     return (data ?? []).map((p: any) => ({
       ...p,
       createdAt: p.created_at || p.createdAt,
+      pinned: p.pinned ?? false,
+      pinnedAt: p.pinned_at ?? p.pinnedAt ?? null,
     })) as Post[];
   } catch (err) {
     console.error('클라우드 게시글 로드 실패:', err);
@@ -135,11 +137,26 @@ export const savePostToCloud = async (post: Post) => {
       attachments: post.attachments,
       password: post.password,
       comments: post.comments,
+      pinned: post.pinned ?? false,
+      pinned_at: post.pinnedAt ?? null,
     });
 
     if (error) throw error;
   } catch (err) {
     console.error('클라우드 게시글 저장 실패:', err);
+  }
+};
+
+
+export const setPostPinnedInCloud = async (id: string, pinned: boolean) => {
+  if (!supabase) return;
+  try {
+    const payload: any = { pinned };
+    payload.pinned_at = pinned ? new Date().toISOString() : null;
+    const { error } = await supabase.from('posts').update(payload).eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('클라우드 게시글 상단고정 설정 실패:', err);
   }
 };
 

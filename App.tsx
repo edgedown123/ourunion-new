@@ -424,7 +424,12 @@ const App: React.FC = () => {
   }, []);
 
   const saveToLocal = (key: string, data: any) => {
-    localStorage.setItem(`union_${key}`, JSON.stringify(data));
+    try {
+      localStorage.setItem(`union_${key}`, JSON.stringify(data));
+    } catch (e) {
+      // localStorage 용량 초과 등으로 저장 실패해도 앱이 죽지 않도록 무시
+      console.warn('localStorage 저장 실패:', e);
+    }
   };
 
 const invalidateMembersCache = () => {
@@ -480,7 +485,9 @@ const invalidateMembersCache = () => {
         createdAt: new Date().toISOString(),
         views: 0,
         attachments: attachments,
-        comments: []
+        comments: [],
+        pinned: false,
+        pinnedAt: null
       };
     }
 
@@ -616,6 +623,25 @@ const invalidateMembersCache = () => {
     pushNav({ tab: activeTab, postId: null, writing: false });
     alert('삭제가 완료되었습니다.');
   };
+
+  const handleTogglePinPost = async (post: Post, pinned: boolean) => {
+    if (userRole !== 'admin') return;
+    const updated: Post = {
+      ...post,
+      pinned,
+      pinnedAt: pinned ? new Date().toISOString() : null,
+    };
+
+    const newPosts = posts.map(p => (p.id === post.id ? updated : p));
+    setPosts(newPosts);
+    saveToLocal('posts', newPosts);
+
+    // 서버 저장 (모든 사용자에게 동일 적용)
+    await cloud.setPostPinnedInCloud(post.id, pinned);
+    await cloud.savePostToCloud(updated); // pinned 값 포함해 upsert (보강)
+  };
+
+
 
 // 휴지통에서 복구 / 영구삭제 (관리자)
 const handleRestorePost = async (postId: string) => {
@@ -1201,6 +1227,7 @@ await cloud.deleteMemberFromCloud(user.id);
               onSelectPost={handleSelectPost} 
               userRole={userRole} 
               onDeletePost={handleDeletePost} 
+              onTogglePin={handleTogglePinPost}
               onSaveComment={handleSaveComment}
               onEditComment={handleEditComment}
               onDeleteComment={handleDeleteComment}

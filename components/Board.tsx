@@ -12,6 +12,7 @@ interface BoardProps {
   onSelectPost: (id: string | null) => void;
   userRole: UserRole;
   onDeletePost?: (id: string) => void;
+  onTogglePin?: (post: Post, pinned: boolean) => void;
   onSaveComment?: (postId: string, content: string, parentId?: string) => void;
   onEditComment?: (postId: string, commentId: string, content: string, parentId?: string) => void;
   onDeleteComment?: (postId: string, commentId: string, parentId?: string) => void;
@@ -30,7 +31,7 @@ const getPageNumbers = (page: number, totalPages: number): number[] => {
 
 const Board: React.FC<BoardProps> = ({ 
   type, posts, onWriteClick, onEditClick, selectedPostId, 
-  onSelectPost, userRole, onDeletePost, onSaveComment, onEditComment, onDeleteComment, currentUserName, currentUserId 
+  onSelectPost, userRole, onDeletePost, onTogglePin, onSaveComment, onEditComment, onDeleteComment, currentUserName, currentUserId 
 }) => {
   const [postMenuOpen, setPostMenuOpen] = useState(false);
   const [newComment, setNewComment] = useState('');
@@ -153,6 +154,14 @@ const Board: React.FC<BoardProps> = ({
     setPostMenuOpen(false);
     onEditClick(selectedPost);
   };
+  const handleTogglePin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!selectedPost || !onTogglePin) return;
+    if (userRole !== 'admin') return;
+    onTogglePin(selectedPost, !(selectedPost.pinned));
+    setPostMenuOpen(false);
+  };
+
 
   const handleDeletePost = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -181,7 +190,15 @@ const Board: React.FC<BoardProps> = ({
   };
 
   const filteredPosts = useMemo(
-    () => posts.filter(p => p.type === type).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    () => posts.filter(p => p.type === type).sort((a, b) => {
+        const ap = !!a.pinned;
+        const bp = !!b.pinned;
+        if (ap !== bp) return ap ? -1 : 1;
+        const at = a.pinnedAt ? new Date(a.pinnedAt).getTime() : 0;
+        const bt = b.pinnedAt ? new Date(b.pinnedAt).getTime() : 0;
+        if (at !== bt) return bt - at;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }),
     [posts, type]
   );
 
@@ -331,6 +348,14 @@ const renderContentWithInlineImages = (raw: string) => {
                   className="absolute right-0 mt-2 w-44 bg-white rounded-2xl border shadow-xl overflow-hidden z-20"
                   onClick={(e) => e.stopPropagation()}
                 >
+                {userRole === 'admin' && (
+                  <button
+                    onClick={handleTogglePin}
+                    className="w-full text-left px-4 py-3 text-sm font-bold hover:bg-yellow-50 text-yellow-800"
+                  >
+                    <i className="fas fa-thumbtack mr-2"></i> {selectedPost?.pinned ? '상단고정 해제' : '상단고정'}
+                  </button>
+                )}
                   <button
                     onClick={handleEditPost}
                     className="w-full text-left px-4 py-3 text-sm font-bold hover:bg-gray-50"
@@ -704,7 +729,7 @@ const renderContentWithInlineImages = (raw: string) => {
                 <li key={post.id}>
                   <button onClick={() => onSelectPost(post.id)} className="w-full text-left p-6 hover:bg-gray-50 transition-colors group">
                     <div className="flex justify-between items-center">
-                      <p className="font-bold text-gray-700 truncate group-hover:text-sky-primary transition-colors flex-1 mr-4">{post.title}</p>
+                      <p className="font-bold text-gray-700 truncate group-hover:text-sky-primary transition-colors flex-1 mr-4 flex items-center gap-2">{post.pinned && (<span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 font-black">📌상단고정</span>)}<span className="truncate">{post.title}</span></p>
                       <span className="text-[11px] text-gray-300 font-black whitespace-nowrap">{formatDate(post.createdAt)}</span>
                     </div>
                   </button>

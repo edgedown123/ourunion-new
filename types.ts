@@ -31,7 +31,10 @@ export interface Post {
   /** (레거시) 게시물 수정/삭제 비밀번호 - 신규 작성에서는 사용하지 않음 */
   password?: string;
   comments?: Comment[]; // 댓글 목록
+  pinned?: boolean; // 상단고정 여부
+  pinnedAt?: string | null; // 상단고정 시각(정렬용)
 }
+
 
 export interface Member {
   id: string;
