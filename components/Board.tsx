@@ -180,6 +180,40 @@ const Board: React.FC<BoardProps> = ({
     setReplyingToId(null);
   };
 
+  const filteredPosts = useMemo(
+    () => posts.filter(p => p.type === type).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [posts, type]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
+
+  // 게시글이 줄어들어 현재 페이지가 범위를 벗어나면 보정
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  // 공지(듀얼) 보드 페이지 보정
+  useEffect(() => {
+    const nTotal = Math.max(1, Math.ceil(posts.filter(p => p.type === 'notice_all').length / POSTS_PER_PAGE));
+    const fTotal = Math.max(1, Math.ceil(posts.filter(p => p.type === 'family_events').length / POSTS_PER_PAGE));
+    if (noticeAllPage > nTotal) setNoticeAllPage(nTotal);
+    if (familyEventPage > fTotal) setFamilyEventPage(fTotal);
+  }, [posts, noticeAllPage, familyEventPage]);
+
+  const pagedPosts = useMemo(
+    () => filteredPosts.slice((page - 1) * POSTS_PER_PAGE, page * POSTS_PER_PAGE),
+    [filteredPosts, page]
+  );
+
+  // 모바일에서 일부 게시판 목록을 더 촘촘하게(행 높이/여백 축소)
+  // - 자유게시판/자료실
+  // - 공지사항 하위 탭(공고/공지, 경조사)
+  const isCompactList =
+    type === 'free' ||
+    type === 'resources' ||
+    type === 'notice_all' ||
+    type === 'family_events';
+
   // 상세 보기 모드
   if (selectedPost) {
     const imageAttachments = selectedPost.attachments?.filter(a => a.type.startsWith('image/')) || [];
@@ -706,40 +740,6 @@ const renderContentWithInlineImages = (raw: string) => {
       </div>
     );
   };
-
-  const filteredPosts = useMemo(
-    () => posts.filter(p => p.type === type).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
-    [posts, type]
-  );
-
-  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
-
-  // 게시글이 줄어들어 현재 페이지가 범위를 벗어나면 보정
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
-
-  // 공지(듀얼) 보드 페이지 보정
-  useEffect(() => {
-    const nTotal = Math.max(1, Math.ceil(posts.filter(p => p.type === 'notice_all').length / POSTS_PER_PAGE));
-    const fTotal = Math.max(1, Math.ceil(posts.filter(p => p.type === 'family_events').length / POSTS_PER_PAGE));
-    if (noticeAllPage > nTotal) setNoticeAllPage(nTotal);
-    if (familyEventPage > fTotal) setFamilyEventPage(fTotal);
-  }, [posts, noticeAllPage, familyEventPage]);
-
-  const pagedPosts = useMemo(
-    () => filteredPosts.slice((page - 1) * POSTS_PER_PAGE, page * POSTS_PER_PAGE),
-    [filteredPosts, page]
-  );
-
-  // 모바일에서 일부 게시판 목록을 더 촘촘하게(행 높이/여백 축소)
-  // - 자유게시판/자료실
-  // - 공지사항 하위 탭(공고/공지, 경조사)
-  const isCompactList =
-    type === 'free' ||
-    type === 'resources' ||
-    type === 'notice_all' ||
-    type === 'family_events';
 
   return (
     <div className="max-w-7xl mx-auto py-10 px-5 animate-fadeIn">
