@@ -273,19 +273,42 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  // 연혁 정렬(최신 날짜가 위로): "YYYY년 MM월 DD일" 형태를 Date로 파싱해서 비교합니다.
+  // 월/일이 비어있으면 1로 처리합니다.
+  const getHistoryTimestamp = (yearText: string) => {
+    const m = yearText.match(/(\d{4})\s*년(?:\s*(\d{1,2})\s*월)?(?:\s*(\d{1,2})\s*일)?/);
+    if (!m) return -Infinity;
+    const y = parseInt(m[1], 10);
+    const mo = m[2] ? parseInt(m[2], 10) : 1;
+    const d = m[3] ? parseInt(m[3], 10) : 1;
+    // UTC로 고정(타임존 영향 최소화)
+    return Date.UTC(y, Math.max(0, mo - 1), Math.max(1, d));
+  };
+
+  const sortHistory = (items: { year: string; text: string }[]) => {
+    return [...items].sort((a, b) => getHistoryTimestamp(b.year) - getHistoryTimestamp(a.year));
+  };
+
   const handleAddHistory = () => {
     if (!newYear || !newText) return alert('연도와 내용은 필수로 입력해주세요.');
     let dateStr = `${newYear}년`;
     if (newMonth) dateStr += ` ${newMonth}월`;
     if (newDay) dateStr += ` ${newDay}일`;
-    const updatedHistory = [{ year: dateStr, text: newText }, ...(settings.history || [])];
-    setSettings({ ...settings, history: updatedHistory });
+    const next = [...(settings.history || []), { year: dateStr, text: newText }];
+    setSettings({ ...settings, history: sortHistory(next) });
     setNewYear(''); setNewMonth(''); setNewDay(''); setNewText('');
   };
 
-  const handleDeleteHistory = (index: number) => {
-    const updatedHistory = settings.history.filter((_, i) => i !== index);
-    setSettings({ ...settings, history: updatedHistory });
+  const handleDeleteHistory = (target: { year: string; text: string }) => {
+    let removed = false;
+    const updatedHistory = (settings.history || []).filter((h) => {
+      if (!removed && h.year === target.year && h.text === target.text) {
+        removed = true;
+        return false;
+      }
+      return true;
+    });
+    setSettings({ ...settings, history: sortHistory(updatedHistory) });
   };
 
   const handleDownloadExcel = () => {
@@ -608,13 +631,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
               <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                {settings.history.map((item, idx) => (
+                {sortHistory(settings.history || []).map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl group border border-transparent hover:border-sky-100 transition-all">
                     <div className="flex items-center space-x-4">
                       <span className="font-black text-sky-700 text-sm w-32">{item.year}</span>
                       <span className="text-sm text-gray-700 font-medium">{item.text}</span>
                     </div>
-                    <button onClick={() => handleDeleteHistory(idx)} className="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i className="fas fa-trash-alt"></i></button>
+                    <button onClick={() => handleDeleteHistory(item)} className="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i className="fas fa-trash-alt"></i></button>
                   </div>
                 ))}
               </div>
