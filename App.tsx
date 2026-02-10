@@ -315,8 +315,17 @@ const App: React.FC = () => {
   };
 
   const pushNav = (s: NavState) => {
+    // NOTE:
+    // - 일부 환경(특히 PWA/모바일 WebView)에서 `history.pushState`로 hash까지
+    //   함께 변경하면 간헐적으로 렌더가 깨지며 흰 화면이 되는 사례가 있어,
+    //   가장 호환성이 좋은 `location.hash` 기반 내비게이션으로 통일합니다.
+    // - `location.hash` 변경은 브라우저가 히스토리 스택을 자동 관리하며
+    //   `hashchange` 이벤트도 안정적으로 발생합니다.
     try {
-      window.history.pushState(s, '', window.location.pathname + buildHash(s));
+      const nextHash = buildHash(s);
+      if (window.location.hash !== nextHash) {
+        window.location.hash = nextHash;
+      }
     } catch {
       // ignore
     }
@@ -324,7 +333,14 @@ const App: React.FC = () => {
 
   const replaceNav = (s: NavState) => {
     try {
-      window.history.replaceState(s, '', window.location.pathname + buildHash(s));
+      const nextHash = buildHash(s);
+      const url = window.location.pathname + nextHash;
+      // replaceState는 URL만 교체(히스토리 추가 X)
+      window.history.replaceState(s, '', url);
+      // 해시도 동기화 (일부 브라우저에서 replaceState만으로 hashchange가 안 남)
+      if (window.location.hash !== nextHash) {
+        window.location.hash = nextHash;
+      }
     } catch {
       // ignore
     }
