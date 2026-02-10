@@ -315,17 +315,8 @@ const App: React.FC = () => {
   };
 
   const pushNav = (s: NavState) => {
-    // NOTE:
-    // - 일부 환경(특히 PWA/모바일 WebView)에서 `history.pushState`로 hash까지
-    //   함께 변경하면 간헐적으로 렌더가 깨지며 흰 화면이 되는 사례가 있어,
-    //   가장 호환성이 좋은 `location.hash` 기반 내비게이션으로 통일합니다.
-    // - `location.hash` 변경은 브라우저가 히스토리 스택을 자동 관리하며
-    //   `hashchange` 이벤트도 안정적으로 발생합니다.
     try {
-      const nextHash = buildHash(s);
-      if (window.location.hash !== nextHash) {
-        window.location.hash = nextHash;
-      }
+      window.history.pushState(s, '', window.location.pathname + buildHash(s));
     } catch {
       // ignore
     }
@@ -333,14 +324,7 @@ const App: React.FC = () => {
 
   const replaceNav = (s: NavState) => {
     try {
-      const nextHash = buildHash(s);
-      const url = window.location.pathname + nextHash;
-      // replaceState는 URL만 교체(히스토리 추가 X)
-      window.history.replaceState(s, '', url);
-      // 해시도 동기화 (일부 브라우저에서 replaceState만으로 hashchange가 안 남)
-      if (window.location.hash !== nextHash) {
-        window.location.hash = nextHash;
-      }
+      window.history.replaceState(s, '', window.location.pathname + buildHash(s));
     } catch {
       // ignore
     }
@@ -439,14 +423,8 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // localStorage 저장은 브라우저/기기(특히 iOS PWA)에서 용량 제한(Quota) 등으로 예외가 날 수 있습니다.
-  // 예외가 나면 React가 그대로 크래시(하얀 화면)할 수 있으므로 반드시 안전하게 처리합니다.
   const saveToLocal = (key: string, data: any) => {
-    try {
-      localStorage.setItem(`union_${key}`, JSON.stringify(data));
-    } catch (e) {
-      console.warn(`[localStorage] save failed: union_${key}`, e);
-    }
+    localStorage.setItem(`union_${key}`, JSON.stringify(data));
   };
 
 const invalidateMembersCache = () => {
@@ -1003,6 +981,7 @@ await cloud.deleteMemberFromCloud(user.id);
     setIsWriting(true);
     setSelectedPostId(null);
     pushNav({ tab: activeTab, postId: null, writing: true });
+    pushNav({ tab: activeTab, postId: null, writing: true });
   };
 
   const handleEditClick = (post: Post) => {
@@ -1029,22 +1008,13 @@ await cloud.deleteMemberFromCloud(user.id);
       const updatedPosts = posts.map(p => {
         if (p.id === id) {
           const updated = { ...p, views: (p.views || 0) + 1 };
-          // 조회수 증가는 UX를 막지 않도록 "비동기 + 실패 무시" 처리
-          try {
-            cloud.savePostToCloud(updated);
-          } catch (e) {
-            console.warn('savePostToCloud failed (ignored):', e);
-          }
+          cloud.savePostToCloud(updated);
           return updated;
         }
         return p;
       });
       setPosts(updatedPosts);
-      // Supabase를 쓰는 경우엔 로컬에 전체 posts를 계속 덮어쓰다 보면(첨부 이미지 등)
-      // localStorage 용량 초과로 앱이 크래시할 수 있어, 조회수 증가에서는 저장을 생략합니다.
-      if (!cloud.isSupabaseEnabled()) {
-        saveToLocal('posts', updatedPosts);
-      }
+      saveToLocal('posts', updatedPosts);
     }
   };
 
@@ -1222,6 +1192,7 @@ await cloud.deleteMemberFromCloud(user.id);
         ) : (
           <div className="relative">
             <Board 
+              key={`${activeTab}:${selectedPostId || 'list'}:${isWriting ? 'w' : 'r'}`}
               type={activeTab as BoardType} 
               posts={posts} 
               onWriteClick={handleWriteClick} 
