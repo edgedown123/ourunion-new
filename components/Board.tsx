@@ -727,9 +727,20 @@ const renderContentWithInlineImages = (raw: string) => {
             <ul className="divide-y divide-gray-50">
               {data.map(post => (
                 <li key={post.id}>
-                  <button onClick={() => onSelectPost(post.id)} className="w-full text-left p-6 hover:bg-gray-50 transition-colors group">
+                  <button
+                    onClick={() => onSelectPost(post.id)}
+                    className={`w-full text-left p-6 transition-colors group relative ${post.pinned ? 'bg-yellow-50/70 hover:bg-yellow-50 pl-9' : 'hover:bg-gray-50'}`}
+                  >
+                    {post.pinned && (
+                      <span className="absolute left-0 top-0 h-full w-1.5 bg-yellow-400" />
+                    )}
                     <div className="flex justify-between items-center">
-                      <p className="font-bold text-gray-700 truncate group-hover:text-sky-primary transition-colors flex-1 mr-4 flex items-center gap-2">{post.pinned && (<span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 font-black">📌상단고정</span>)}<span className="truncate">{post.title}</span></p>
+                      <p className="font-bold text-gray-700 truncate group-hover:text-sky-primary transition-colors flex-1 mr-4 flex items-center gap-2">
+                        {post.pinned && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-200/60 text-yellow-900 font-black border border-yellow-300/60">📌 상단고정</span>
+                        )}
+                        <span className="truncate">{post.title}</span>
+                      </p>
                       <span className="text-[11px] text-gray-300 font-black whitespace-nowrap">{formatDate(post.createdAt)}</span>
                     </div>
                   </button>
@@ -798,11 +809,20 @@ const renderContentWithInlineImages = (raw: string) => {
                 <li key={post.id}>
                   <button
                     onClick={() => onSelectPost(post.id)}
-                    className={`block w-full text-left hover:bg-gray-50/40 transition-all group ${isCompactList ? 'p-4 md:p-8' : 'p-8 md:p-10'}`}
+                    className={`block w-full text-left transition-all group relative ${post.pinned ? 'bg-yellow-50/70 hover:bg-yellow-50' : 'hover:bg-gray-50/40'} ${isCompactList ? 'p-4 md:p-8' : 'p-8 md:p-10'} ${post.pinned ? (isCompactList ? 'pl-7 md:pl-10' : 'pl-10 md:pl-12') : ''}`}
                   >
+                    {post.pinned && (
+                      <span className="absolute left-0 top-0 h-full w-1.5 bg-yellow-400" />
+                    )}
                     <div className={`flex justify-between items-start ${isCompactList ? 'mb-2' : 'mb-4'}`}>
                       <div className="flex-1 pr-4">
-                        <p className={`${isCompactList ? 'text-base md:text-xl' : 'text-lg md:text-xl'} font-black text-gray-800 truncate group-hover:text-sky-primary transition-colors`}>{post.title}</p>
+                        <p className={`${isCompactList ? 'text-base md:text-xl' : 'text-lg md:text-xl'} font-black text-gray-800 truncate group-hover:text-sky-primary transition-colors flex items-center gap-2`}
+                          >
+                            {post.pinned && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-200/60 text-yellow-900 font-black border border-yellow-300/60">📌 상단고정</span>
+                            )}
+                            <span className="truncate">{post.title}</span>
+                          </p>
                         <div className={`${isCompactList ? 'mt-1' : 'mt-3'} flex items-center space-x-4 text-xs md:text-sm text-gray-400 font-bold uppercase tracking-wider`}>
                           <span className="flex items-center"><i className="fas fa-user-circle mr-2 text-sky-primary/30"></i>{post.author}</span>
                           <span className="flex items-center"><i className="fas fa-eye mr-2"></i>조회 {post.views}</span>
