@@ -188,11 +188,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const imageCount = attachments.filter(a => a.type?.startsWith('image/')).length;
   const docCount = attachments.length - imageCount;
 
-  const imageCount = attachments.filter(a => a.type?.startsWith('image/')).length;
-  const docCount = attachments.length - imageCount;
-
-  const imageCount = attachments.filter(a => a.type?.startsWith('image/')).length;
-  const docCount = attachments.length - imageCount;
 
 
   const insertImageTokenAtCursor = (token: string) => {
