@@ -36,7 +36,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [adminTab, setAdminTab] = useState<'members' | 'intro' | 'offices' | 'posts' | 'storage' | 'push' | 'settings'>('members');
   const [openMemberActionId, setOpenMemberActionId] = useState<string | null>(null);
   const [openPostActionId, setOpenPostActionId] = useState<string | null>(null);
-  const [activeOfficeId, setActiveOfficeId] = useState<string | null>(settings.offices[0]?.id || null);
+  const [activeOfficeId, setActiveOfficeId] =
+  useState<string | null>(settings?.offices?.[0]?.id ?? null);
+
 
   // 푸시 디버그
   const [pushDebug, setPushDebug] = useState<any>(null);
@@ -1075,10 +1077,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
                     // 저장 결과가 궁금하면 "구독 상태 보기" 버튼으로 확인 가능
                     alert('알림이 켜졌습니다! (권한 + 구독 저장 완료)');
-                  } catch (e) {
-                    console.error(e);
-                    alert(`알림 켜기 실패: ${e?.message || String(e)}`);
-                  }
+                  } catch (error: unknown) {
+  const msg = error instanceof Error ? error.message : String(error);
+  setQuietError(msg);
+}
+
                 }}
               >
                 알림 켜기 (권한 + 구독 저장)
@@ -1120,11 +1123,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     } else {
                       setPushDbStatus({ ok: false, error: '이 브라우저에 구독(subscription)이 없습니다.' });
                     }
-                  } catch (e) {
-                    setPushDbStatus({ ok: false, error: e?.message || String(e) });
-                  } finally {
-                    setPushDebugLoading(false);
-                  }
+                  } catch (e: unknown) {
+  const msg = e instanceof Error ? e.message : String(e);
+  setPushDbStatus({ ok: false, error: msg });
+}
+
                 }}
               >
                 {pushDebugLoading ? '확인 중...' : '구독 상태 보기 (디버그)'}
