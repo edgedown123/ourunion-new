@@ -126,12 +126,18 @@ export const savePostToCloud = async (post: Post) => {
   if (!supabase) return;
 
   try {
+    // Supabase Auth uid를 posts.user_id에 저장 (스키마 마이그레이션 대응)
+    const session = await getAuthSession();
+    const uid = session?.user?.id ?? null;
+
     const { error } = await supabase.from('posts').upsert({
       id: post.id,
       type: post.type,
       title: post.title,
       content: post.content,
       author: post.author,
+      // 새 컬럼: user_id (uuid)
+      user_id: (post as any).user_id ?? post.userId ?? uid,
       created_at: post.createdAt,
       views: post.views,
       attachments: post.attachments,

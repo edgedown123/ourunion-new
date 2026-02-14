@@ -24,6 +24,8 @@ export interface Post {
   author: string;
   /** 작성자 식별자(조합원: member.id, 관리자: 'admin'). 기존 게시물 호환을 위해 optional */
   authorId?: string;
+  /** Supabase Auth uid (posts.user_id) */
+  userId?: string;
   createdAt: string;
   views: number;
   imageUrl?: string;
