@@ -285,46 +285,74 @@ const Board: React.FC<BoardProps> = ({
     };
 
 
-const renderContentWithInlineImages = (raw: string) => {
-  const parts = raw.split(/\[\[img:(\d+)\]\]/g);
-  const used = new Set<number>();
-  const nodes: React.ReactNode[] = [];
+const renderContentWithInlineImages = (raw?: unknown) => {
+  // Supabase/레거시 데이터에서 content가 null/undefined로 들어올 수 있어 안전 처리
+  const safeRaw =
+    typeof raw === 'string'
+      ? raw
+      : raw == null
+        ? ''
+        : String(raw);
 
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 2 === 0) {
-      if (parts[i]) {
-        nodes.push(
-          <span key={`t-${i}`} className="whitespace-pre-wrap break-words">
-            {linkifyText(parts[i])}
-          </span>
-        );
-      }
-    } else {
-      const idx = Number(parts[i]);
-      if (!Number.isNaN(idx) && imageAttachments[idx]) {
-        used.add(idx);
-        nodes.push(
-          <div
-            key={`img-${i}`}
-            // 이미지가 너무 "꽉" 차 보이지 않도록 좌우 여백을 조금 남기기
-            // (기존: 카드 패딩을 "뚫고" 풀-블리드에 가깝게 표시)
-            className="my-4 w-[calc(100%+2rem)] -mx-4 overflow-hidden rounded-2xl border border-gray-100 bg-white md:w-[calc(100%+3rem)] md:-mx-6"
-          >
-            <img
-              src={imageAttachments[idx].data}
-              alt={`본문 이미지 ${idx + 1}`}
-              className="w-full h-auto object-cover"
-              loading="lazy"
-            />
-          </div>
-        );
+  try {
+    const parts = safeRaw.split(/\[\[img:(\d+)\]\]/g);
+    const used = new Set<number>();
+    const nodes: React.ReactNode[] = [];
+
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 0) {
+        if (parts[i]) {
+          nodes.push(
+            <span key={`t-${i}`} className="whitespace-pre-wrap break-words">
+              {linkifyText(parts[i])}
+            </span>
+          );
+        }
+      } else {
+        const idx = Number(parts[i]);
+        if (!Number.isNaN(idx) && imageAttachments?.[idx]) {
+          used.add(idx);
+          nodes.push(
+            <div
+              key={`img-${i}`}
+              // 이미지가 너무 "꽉" 차 보이지 않도록 좌우 여백을 조금 남기기
+              // (기존: 카드 패딩을 "뚫고" 풀-블리드에 가깝게 표시)
+              className="my-4 w-[calc(100%+2rem)] -mx-4 overflow-hidden rounded-2xl border border-gray-100 bg-white md:w-[calc(100%+3rem)] md:-mx-6"
+            >
+              <img
+                src={imageAttachments[idx].data}
+                alt={`본문 이미지 ${idx + 1}`}
+                className="w-full h-auto object-cover"
+                loading="lazy"
+              />
+            </div>
+          );
+        }
       }
     }
-  }
 
-  return { nodes, used };
-};
-    const isNoticeCategory = selectedPost.type === 'notice_all' || selectedPost.type === 'family_events';
+    // 본문이 완전히 비어있는 경우에도 최소한의 노드를 반환(렌더 크래시 방지)
+    if (nodes.length === 0) {
+      nodes.push(
+        <span key="empty" className="whitespace-pre-wrap break-words text-gray-500">
+          (내용 없음)
+        </span>
+      );
+    }
+
+    return { nodes, used };
+  } catch (e) {
+    console.error('[Board] renderContentWithInlineImages failed:', e);
+    return {
+      nodes: [
+        <span key="err" className="whitespace-pre-wrap break-words text-gray-500">
+          (내용을 표시할 수 없습니다)
+        </span>,
+      ],
+      used: new Set<number>(),
+    };
+  }
+};    const isNoticeCategory = selectedPost.type === 'notice_all' || selectedPost.type === 'family_events';
 
     return (
       <div className="max-w-4xl mx-auto py-8 px-2 sm:px-5 animate-fadeIn">
