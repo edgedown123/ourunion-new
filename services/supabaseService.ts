@@ -78,7 +78,7 @@ export const fetchMemberByIdFromCloud = async (id: string): Promise<Member | nul
   try {
     const { data, error } = await supabase
       .from('members')
-      .select('*')
+      .select('id, loginId, name, birthDate, phone, email, garage, created_at, isApproved, role')
       .eq('id', id)
       .single();
 
@@ -149,6 +149,58 @@ export const fetchPostByIdFromCloud = async (id: string): Promise<Post | null> =
   }
 };
 
+
+export const fetchPostMainByIdFromCloud = async (id: string): Promise<Post | null> => {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      // ✅ 상세 화면 기본 렌더에 필요한 최소 필드만 (attachments/comments는 별도 로드)
+      .select('id, type, title, content, author, created_at, views, password, pinned, pinned_at')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    const p: any = data;
+    return {
+      ...p,
+      createdAt: p.created_at || p.createdAt,
+      pinned: p.pinned ?? false,
+      pinnedAt: p.pinned_at ?? p.pinnedAt ?? null,
+    } as Post;
+  } catch (err) {
+    console.error('클라우드 게시글 단건(기본) 조회 실패:', err);
+    return null;
+  }
+};
+
+export const fetchPostExtrasByIdFromCloud = async (id: string): Promise<Pick<Post, 'attachments' | 'comments'> | null> => {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      // ✅ 무거운 필드만 지연 로드 (Egress 절감)
+      .select('attachments, comments')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    const p: any = data;
+    return {
+      attachments: p.attachments ?? [],
+      comments: p.comments ?? [],
+    };
+  } catch (err) {
+    console.error('클라우드 게시글 단건(첨부/댓글) 조회 실패:', err);
+    return null;
+  }
+};
+
+
 export const updatePostViewsInCloud = async (id: string, views: number) => {
   if (!supabase) return;
   try {
@@ -216,7 +268,7 @@ export const fetchMembersFromCloud = async (): Promise<Member[] | null> => {
   try {
     const { data, error } = await supabase
       .from('members')
-      .select('*')
+      .select('id, loginId, name, birthDate, phone, email, garage, created_at, isApproved, role')
       .order('created_at', { ascending: false });
 
     if (error) throw error;

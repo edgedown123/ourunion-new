@@ -10,6 +10,7 @@ interface BoardProps {
   onEditClick: (post: Post) => void;
   selectedPostId: string | null;
   onSelectPost: (id: string | null) => void;
+  onLoadPostExtras?: (id: string) => Promise<void> | void;
   userRole: UserRole;
   onDeletePost?: (id: string) => void;
   onTogglePin?: (post: Post, pinned: boolean) => void;
@@ -31,7 +32,7 @@ const getPageNumbers = (page: number, totalPages: number): number[] => {
 
 const Board: React.FC<BoardProps> = ({ 
   type, posts, onWriteClick, onEditClick, selectedPostId, 
-  onSelectPost, userRole, onDeletePost, onTogglePin, onSaveComment, onEditComment, onDeleteComment, currentUserName, currentUserId 
+  onSelectPost, onLoadPostExtras, userRole, onDeletePost, onTogglePin, onSaveComment, onEditComment, onDeleteComment, currentUserName, currentUserId 
 }) => {
   const [postMenuOpen, setPostMenuOpen] = useState(false);
   const [newComment, setNewComment] = useState('');
@@ -47,16 +48,67 @@ const Board: React.FC<BoardProps> = ({
   const [editingTarget, setEditingTarget] = useState<{ commentId: string; parentId?: string } | null>(null);
   const [editDraft, setEditDraft] = useState('');
 
+  // 첨부/댓글 지연 로드 (Egress 절감)
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const [extrasLoading, setExtrasLoading] = useState(false);
+  const [extrasError, setExtrasError] = useState<string | null>(null);
+
+
   // 게시판 전환 시 페이징 초기화
   useEffect(() => {
     setPage(1);
     setNoticeAllPage(1);
     setFamilyEventPage(1);
   }, [type]);
+
+  // 선택한 게시글이 바뀌면 첨부/댓글 펼침 상태 초기화
+  useEffect(() => {
+    setExtrasOpen(false);
+    setExtrasLoading(false);
+    setExtrasError(null);
+  }, [selectedPostId]);
+
+
   
   const canManageComment = (author: string) => userRole === 'admin' || (userRole !== 'guest' && author === (currentUserName || ''));
 
   const selectedPost = selectedPostId ? posts.find(p => p.id === selectedPostId && p.type === type) : null;
+
+
+  const needsExtrasLoad =
+    !!selectedPost && (selectedPost.attachments === undefined || selectedPost.comments === undefined);
+
+  const toggleExtras = async () => {
+    if (!selectedPost) return;
+
+    // 접기
+    if (extrasOpen) {
+      setExtrasOpen(false);
+      return;
+    }
+
+    // 펼치기
+    setExtrasError(null);
+
+    // 이미 로드되어 있으면 바로 펼침
+    if (!needsExtrasLoad) {
+      setExtrasOpen(true);
+      return;
+    }
+
+    // 아직 로드 전이면 서버에서 한 번만 가져옴
+    try {
+      setExtrasLoading(true);
+      await onLoadPostExtras?.(selectedPost.id);
+      setExtrasOpen(true);
+    } catch (e: any) {
+      setExtrasError('첨부/댓글을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+      setExtrasOpen(false);
+    } finally {
+      setExtrasLoading(false);
+    }
+  };
+
 
   // 날짜 포맷팅 유틸리티 함수 (YYYY.MM.DD HH:mm)
   const formatDate = (dateStr: string | undefined) => {
@@ -437,7 +489,27 @@ const renderContentWithInlineImages = (raw?: unknown) => {
             );
           })()}
 
-          {selectedPost.attachments && selectedPost.attachments.length > 0 && (
+
+          {/* 첨부/댓글 지연 로드 버튼 (Egress 절감) */}
+          <div className="mt-8 flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={toggleExtras}
+              disabled={extrasLoading}
+              className={`px-6 py-3 rounded-2xl font-bold shadow-sm border transition ${
+                extrasLoading
+                  ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                  : extrasOpen
+                    ? 'bg-white text-gray-900 border-gray-300 hover:bg-gray-50'
+                    : 'bg-sky-600 text-white border-sky-600 hover:bg-sky-700'
+              }`}
+            >
+              {extrasLoading ? '첨부/댓글 불러오는 중…' : (extrasOpen ? '첨부/댓글 접기' : '첨부/댓글 펼치기')}
+            </button>
+            {extrasError && <p className="text-sm text-red-600">{extrasError}</p>}
+          </div>
+
+          {extrasOpen && selectedPost.attachments && selectedPost.attachments.length > 0 && (
             // 모바일에서 점선 박스(첨부파일 영역) 내부 패딩을 줄여 카드/파일명이 더 넓게 보이도록
             <div className="mt-20 p-4 md:p-10 bg-gray-50/50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
               <p className="text-xs font-black text-gray-400 mb-6 uppercase tracking-widest flex items-center">
@@ -471,6 +543,8 @@ const renderContentWithInlineImages = (raw?: unknown) => {
           )}
         </article>
 
+        {extrasOpen && (
+        <>
         {/* 댓글 섹션 */}
         <section className="bg-white rounded-[2.5rem] border p-4 md:p-7 shadow-sm">
           <h3 className="text-lg md:text-xl font-black text-gray-900 mb-3 md:mb-5 flex items-center">
@@ -705,6 +779,9 @@ const renderContentWithInlineImages = (raw?: unknown) => {
             </form>
           )}
         </section>
+        </>
+        )}
+
       </div>
     );
   }

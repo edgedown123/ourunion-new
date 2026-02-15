@@ -90,33 +90,20 @@ export default async function handler(req, res) {
       const quiet_start = normalizeTimeStr(body.quiet_start, '22:00');
       const quiet_end = normalizeTimeStr(body.quiet_end, '09:00');
 
-      // Prefer UPDATE over UPSERT to avoid requiring INSERT RLS policy.
-// (UPSERT uses INSERT ... ON CONFLICT, which still triggers INSERT RLS checks.)
-const { data: updatedRows, error: updateError } = await supabaseAdmin
-  .from(TABLE)
-  .update({
-    quiet_enabled: enabled,
-    quiet_start,
-    quiet_end,
-    updated_at: new Date().toISOString(),
-  })
-  .eq('id', 1)
-  .select('id')
-  .maybeSingle();
+      const { error } = await supabaseAdmin
+        .from(TABLE)
+        .upsert(
+          {
+            id: 1,
+            quiet_enabled: enabled,
+            quiet_start,
+            quiet_end,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'id' }
+        );
 
-if (updateError) return res.status(500).json({ ok: false, error: updateError.message });
-
-// If the row somehow doesn't exist, try to create it (may require INSERT policy; service role bypasses).
-if (!updatedRows) {
-  const { error: insertError } = await supabaseAdmin.from(TABLE).insert({
-    id: 1,
-    quiet_enabled: enabled,
-    quiet_start,
-    quiet_end,
-    updated_at: new Date().toISOString(),
-  });
-  if (insertError) return res.status(500).json({ ok: false, error: insertError.message });
-}
+      if (error) return res.status(500).json({ ok: false, error: error.message });
 
       const row = await ensureRow();
       return res.status(200).json({ ok: true, settings: row });
