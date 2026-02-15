@@ -97,41 +97,24 @@ export const fetchMemberByIdFromCloud = async (id: string): Promise<Member | nul
 };
 
 // --------------------------------------
-// 게시글 동기화 (✅ 용량 폭증 방지: 목록은 경량 조회)
+// 게시글 동기화
 // --------------------------------------
-
-/**
- * ✅ 목록 조회 전용(경량)
- * - select('*') 금지
- * - content / attachments / comments 등 무거운 필드는 목록에서 내려받지 않습니다.
- */
 export const fetchPostsFromCloud = async (): Promise<Post[] | null> => {
   if (!supabase) return null;
 
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select('id,type,title,author,user_id,created_at,views,pinned,pinned_at')
-      .order('pinned', { ascending: false })
-      .order('pinned_at', { ascending: false, nullsFirst: false })
+      .select('*')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
     return (data ?? []).map((p: any) => ({
-      id: p.id,
-      type: p.type,
-      title: p.title,
-      author: p.author,
-      authorId: p.user_id ?? undefined,
-      createdAt: p.created_at,
-      views: p.views ?? 0,
+      ...p,
+      createdAt: p.created_at || p.createdAt,
       pinned: p.pinned ?? false,
-      pinnedAt: p.pinned_at ?? null,
-      // ✅ 경량화: 목록에서는 본문/첨부/댓글 미포함
-      content: undefined,
-      attachments: undefined,
-      comments: undefined,
+      pinnedAt: p.pinned_at ?? p.pinnedAt ?? null,
     })) as Post[];
   } catch (err) {
     console.error('클라우드 게시글 로드 실패:', err);
@@ -139,79 +122,31 @@ export const fetchPostsFromCloud = async (): Promise<Post[] | null> => {
   }
 };
 
-/**
- * ✅ 상세 조회 전용(1건)
- * - 상세 진입 시에만 content/attachments/comments를 가져옵니다.
- */
-export const fetchPostByIdFromCloud = async (id: string): Promise<Post | null> => {
-  if (!supabase) return null;
-  try {
-    const { data, error } = await supabase
-      .from('posts')
-      .select('id,type,title,content,author,user_id,created_at,views,attachments,comments,password,pinned,pinned_at')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    if (!data) return null;
-
-    return {
-      ...data,
-      authorId: (data as any).user_id ?? (data as any).authorId,
-      createdAt: (data as any).created_at ?? (data as any).createdAt,
-      pinned: (data as any).pinned ?? false,
-      pinnedAt: (data as any).pinned_at ?? (data as any).pinnedAt ?? null,
-    } as Post;
-  } catch (err) {
-    console.error('클라우드 게시글 상세 로드 실패:', err);
-    return null;
-  }
-};
-
-/**
- * ✅ 조회수 증가(가볍게 UPDATE만)
- * - 기존 savePostToCloud(upsert)로 전체 row를 덮어쓰지 않도록 분리
- */
-export const incrementPostViewsInCloud = async (id: string, nextViews: number) => {
+export const savePostToCloud = async (post: Post) => {
   if (!supabase) return;
-  try {
-    const { error } = await supabase.from('posts').update({ views: nextViews }).eq('id', id);
-    if (error) throw error;
-    return true;
-  } catch (err) {
-    console.error('클라우드 조회수 업데이트 실패:', err);
-  }
-};
-
-export const savePostToCloud = async (post: Post): Promise<boolean> => {
-  if (!supabase) return false;
 
   try {
     const { error } = await supabase.from('posts').upsert({
       id: post.id,
       type: post.type,
       title: post.title,
-      content: post.content ?? '',
+      content: post.content,
       author: post.author,
-      // ✅ 새 스키마: posts.user_id 사용
-      user_id: post.authorId ?? null,
       created_at: post.createdAt,
       views: post.views,
-      // ✅ attachments는 Storage URL만 저장해야 함
-      attachments: post.attachments ?? [],
+      attachments: post.attachments,
       password: post.password,
-      comments: post.comments ?? [],
+      comments: post.comments,
       pinned: post.pinned ?? false,
       pinned_at: post.pinnedAt ?? null,
     });
 
     if (error) throw error;
-    return true;
   } catch (err) {
     console.error('클라우드 게시글 저장 실패:', err);
-    return false;
   }
 };
+
 
 export const setPostPinnedInCloud = async (id: string, pinned: boolean) => {
   if (!supabase) return;
@@ -220,7 +155,6 @@ export const setPostPinnedInCloud = async (id: string, pinned: boolean) => {
     payload.pinned_at = pinned ? new Date().toISOString() : null;
     const { error } = await supabase.from('posts').update(payload).eq('id', id);
     if (error) throw error;
-    return true;
   } catch (err) {
     console.error('클라우드 게시글 상단고정 설정 실패:', err);
   }
@@ -288,7 +222,6 @@ export const deleteMemberFromCloud = async (id: string) => {
   try {
     const { error } = await supabase.from('members').delete().eq('id', id);
     if (error) throw error;
-    return true;
   } catch (err) {
     console.error('클라우드 회원 삭제 실패:', err);
   }
@@ -380,7 +313,6 @@ export const saveSettingsToCloud = async (settings: SiteSettings) => {
       .upsert({ id: 'main', data: safeSettings });
 
     if (error) throw error;
-    return true;
   } catch (err) {
     console.error('클라우드 설정 저장 실패:', err);
   }
@@ -498,115 +430,4 @@ export const uploadSiteImage = async (file: File, pathPrefix: string): Promise<s
 
   const { data } = supabase.storage.from('site-assets').getPublicUrl(path);
   return data.publicUrl;
-};
-
-
-/* -----------------------------------------------------
- * ✅ 게시글 첨부 업로드 (Supabase Storage: attachments)
- * - DB에는 URL만 저장 (Base64 금지)
- * ----------------------------------------------------- */
-const ATTACHMENTS_BUCKET = 'attachments';
-
-const safeRandom = () => {
-  try {
-    // @ts-ignore
-    return (crypto?.randomUUID?.() as string) || Math.random().toString(16).slice(2);
-  } catch {
-    return Math.random().toString(16).slice(2);
-  }
-};
-
-export const uploadPostAttachment = async (file: File, postId: string): Promise<any> => {
-  if (!supabase) throw new Error('Supabase is not enabled');
-
-  // 이미지면 리사이즈/압축 (용량 절감)
-  const processed = await resizeImageBeforeUpload(file).catch(() => file);
-
-  const ext = processed.name.split('.').pop() || 'bin';
-  const safeName = `${Date.now()}_${safeRandom()}.${ext}`;
-  const path = `posts/${postId}/${safeName}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from(ATTACHMENTS_BUCKET)
-    .upload(path, processed, { upsert: true, contentType: processed.type });
-
-  if (uploadError) throw uploadError;
-
-  // public bucket이면 publicUrl 사용
-  const pub = supabase.storage.from(ATTACHMENTS_BUCKET).getPublicUrl(path);
-  let url = pub?.data?.publicUrl || '';
-
-  // publicUrl이 비어있으면(비공개 버킷) signed url fallback
-  if (!url) {
-    const { data: signed, error } = await supabase.storage
-      .from(ATTACHMENTS_BUCKET)
-      .createSignedUrl(path, 60 * 60 * 24 * 365); // 1년
-    if (error) throw error;
-    url = signed?.signedUrl || '';
-  }
-
-  return {
-    name: file.name,
-    type: processed.type || file.type,
-    url,
-    path,
-    size: processed.size || file.size,
-  };
-};
-
-export const deletePostAttachments = async (paths: string[]) => {
-  if (!supabase) return;
-  const safe = (paths || []).filter(Boolean);
-  if (safe.length === 0) return;
-  try {
-    const { error } = await supabase.storage.from(ATTACHMENTS_BUCKET).remove(safe);
-    if (error) throw error;
-    return true;
-  } catch (err) {
-    console.warn('첨부파일 Storage 삭제 실패(무시 가능):', err);
-  }
-};
-
-/**
- * ✅ 작성/수정 저장 직전에 첨부 목록을 "URL 기반"으로 정규화합니다.
- * - DraftAttachment(file 포함)은 업로드 후 URL로 변환
- * - 기존 URL 첨부는 유지
- * - 제거된 첨부(편집 시) path가 있으면 Storage에서도 삭제(가능한 범위에서)
- */
-export const preparePostAttachmentsForSave = async (
-  draft: any[] | undefined,
-  postId: string,
-  prev: any[] | undefined
-) => {
-  const nextDraft = Array.isArray(draft) ? draft : [];
-  const prevList = Array.isArray(prev) ? prev : [];
-
-  // 삭제된 것들(이전에는 있었는데 draft에는 없는 것)
-  const nextPaths = new Set(nextDraft.map((a: any) => a?.path).filter(Boolean));
-  const removedPaths = prevList.map((a: any) => a?.path).filter((p: any) => p && !nextPaths.has(p));
-
-  // 업로드 필요한 새 파일들
-  const newOnes = nextDraft.filter((a: any) => a?.file instanceof File);
-  const existing = nextDraft
-    .filter((a: any) => !(a?.file instanceof File))
-    .map((a: any) => ({
-      name: a.name,
-      type: a.type,
-      url: a.url || a.data || '',
-      path: a.path,
-      size: a.size,
-    }));
-
-  const uploaded = [];
-  for (const a of newOnes) {
-    const u = await uploadPostAttachment(a.file as File, postId);
-    uploaded.push(u);
-  }
-
-  // best-effort 삭제
-  if (removedPaths.length > 0) {
-    await deletePostAttachments(removedPaths as string[]);
-  }
-
-  return [...existing, ...uploaded];
 };

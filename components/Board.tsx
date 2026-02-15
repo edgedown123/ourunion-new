@@ -391,18 +391,18 @@ const renderContentWithInlineImages = (raw: string) => {
           </header>
 
           <div className="prose prose-sky max-w-none text-gray-700 leading-relaxed min-h-[120px] md:min-h-[200px] text-base md:text-lg prose-p:my-3">
-            {renderContentWithInlineImages(selectedPost.content || '').nodes}
+            {renderContentWithInlineImages(selectedPost.content).nodes}
           </div>
 
           {(() => {
-            const { used } = renderContentWithInlineImages(selectedPost.content || '');
+            const { used } = renderContentWithInlineImages(selectedPost.content);
             const remaining = imageAttachments.filter((_, idx) => !used.has(idx));
             if (remaining.length === 0) return null;
             return (
               <div className="mt-14 space-y-8">
                 {remaining.map((img, idx) => (
                   <div key={idx} className="rounded-3xl overflow-hidden shadow-xl border border-gray-100">
-                    <img src={(img as any).url || (img as any).data} alt={`첨부 이미지 ${idx + 1}`} className="w-full h-auto object-contain bg-gray-50" />
+                    <img src={img.data} alt={`첨부 이미지 ${idx + 1}`} className="w-full h-auto object-contain bg-gray-50" />
                   </div>
                 ))}
               </div>
@@ -430,7 +430,7 @@ const renderContentWithInlineImages = (raw: string) => {
 
                     {/* 다운로드 버튼 (모바일: 아래로 분리 / 텍스트 줄바꿈 방지) */}
                     <a
-                      href={(file as any).url || (file as any).data}
+                      href={file.data}
                       download={file.name}
                       className="inline-flex w-fit items-center justify-center px-3 py-1.5 bg-sky-primary text-white text-[11px] font-black rounded-lg shadow-sm hover:opacity-90 active:scale-95 transition-all whitespace-nowrap"
                     >

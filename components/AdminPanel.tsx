@@ -99,8 +99,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // -----------------------------
   // 첨부파일(게시글 attachments) 사용량 계산
-  // - (과거) attachments.data(dataURL/base64) 저장 방식이 있었으나, 현재는 Storage URL 방식입니다.
-  // - size가 없고 legacy dataURL이 있을 때만 base64 길이로 대략 바이트를 계산합니다.
+  // - attachments.data 는 dataURL(base64) 형태로 저장됩니다.
+  // - base64를 실제로 디코딩하지 않고 길이로 대략 바이트를 계산합니다.
   // -----------------------------
   const dataUrlToBytes = (dataUrl: string): number => {
     if (!dataUrl) return 0;
@@ -125,10 +125,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     return `${size.toFixed(fixed)}${units[idx]}`;
   };
 
-  const downloadFile = (url: string, filename: string) => {
+  const downloadDataUrl = (dataUrl: string, filename: string) => {
     try {
       const link = document.createElement('a');
-      link.href = url;
+      link.href = dataUrl;
       link.download = filename || 'download';
       document.body.appendChild(link);
       link.click();
@@ -167,7 +167,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     for (const p of posts || []) {
       const list = p.attachments || [];
       for (const a of list) {
-        const bytes = (a as any).size ?? dataUrlToBytes((a as any).data || '');
+        const bytes = dataUrlToBytes(a.data);
         rows.push({
           postId: p.id,
           postTitle: p.title,
@@ -176,7 +176,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           fileName: a.name,
           mime: a.type,
           bytes,
-          url: (a as any).url || (a as any).data || '',
+          dataUrl: a.data,
         });
       }
     }
@@ -273,42 +273,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  // 연혁 정렬(최신 날짜가 위로): "YYYY년 MM월 DD일" 형태를 Date로 파싱해서 비교합니다.
-  // 월/일이 비어있으면 1로 처리합니다.
-  const getHistoryTimestamp = (yearText: string) => {
-    const m = yearText.match(/(\d{4})\s*년(?:\s*(\d{1,2})\s*월)?(?:\s*(\d{1,2})\s*일)?/);
-    if (!m) return -Infinity;
-    const y = parseInt(m[1], 10);
-    const mo = m[2] ? parseInt(m[2], 10) : 1;
-    const d = m[3] ? parseInt(m[3], 10) : 1;
-    // UTC로 고정(타임존 영향 최소화)
-    return Date.UTC(y, Math.max(0, mo - 1), Math.max(1, d));
-  };
-
-  const sortHistory = (items: { year: string; text: string }[]) => {
-    return [...items].sort((a, b) => getHistoryTimestamp(b.year) - getHistoryTimestamp(a.year));
-  };
-
   const handleAddHistory = () => {
     if (!newYear || !newText) return alert('연도와 내용은 필수로 입력해주세요.');
     let dateStr = `${newYear}년`;
     if (newMonth) dateStr += ` ${newMonth}월`;
     if (newDay) dateStr += ` ${newDay}일`;
-    const next = [...(settings.history || []), { year: dateStr, text: newText }];
-    setSettings({ ...settings, history: sortHistory(next) });
+    const updatedHistory = [{ year: dateStr, text: newText }, ...(settings.history || [])];
+    setSettings({ ...settings, history: updatedHistory });
     setNewYear(''); setNewMonth(''); setNewDay(''); setNewText('');
   };
 
-  const handleDeleteHistory = (target: { year: string; text: string }) => {
-    let removed = false;
-    const updatedHistory = (settings.history || []).filter((h) => {
-      if (!removed && h.year === target.year && h.text === target.text) {
-        removed = true;
-        return false;
-      }
-      return true;
-    });
-    setSettings({ ...settings, history: sortHistory(updatedHistory) });
+  const handleDeleteHistory = (index: number) => {
+    const updatedHistory = settings.history.filter((_, i) => i !== index);
+    setSettings({ ...settings, history: updatedHistory });
   };
 
   const handleDownloadExcel = () => {
@@ -631,13 +608,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
               <div className="space-y-2 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
-                {sortHistory(settings.history || []).map((item, idx) => (
+                {settings.history.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl group border border-transparent hover:border-sky-100 transition-all">
                     <div className="flex items-center space-x-4">
                       <span className="font-black text-sky-700 text-sm w-32">{item.year}</span>
                       <span className="text-sm text-gray-700 font-medium">{item.text}</span>
                     </div>
-                    <button onClick={() => handleDeleteHistory(item)} className="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i className="fas fa-trash-alt"></i></button>
+                    <button onClick={() => handleDeleteHistory(idx)} className="text-red-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><i className="fas fa-trash-alt"></i></button>
                   </div>
                 ))}
               </div>
@@ -929,7 +906,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                               <td className="py-3 pr-3 text-right font-black text-gray-900 whitespace-nowrap">{formatFileSize(f.bytes)}</td>
                               <td className="py-3 text-right">
                                 <button
-                                  onClick={() => downloadFile((f as any).url, f.fileName)}
+                                  onClick={() => downloadDataUrl(f.dataUrl, f.fileName)}
                                   className="px-3 py-2 bg-sky-primary text-white rounded-xl font-black text-xs hover:opacity-90 transition-all whitespace-nowrap"
                                 >
                                   다운로드

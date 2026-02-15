@@ -1,19 +1,11 @@
+
 export type BoardType = 'intro' | 'notice_all' | 'family_events' | 'free' | 'resources' | 'signup' | 'trash';
 export type UserRole = 'guest' | 'member' | 'admin';
 
-/**
- * ✅ 첨부파일 모델 (Supabase Storage 기반)
- * - DB에는 Base64(dataURL) 저장 금지
- * - url/path만 저장합니다.
- * - data는 레거시 호환(과거 Base64 저장분)용으로만 optional로 남겨둡니다.
- */
 export interface PostAttachment {
   name: string;
+  data: string; // Base64 string
   type: string; // MIME type
-  url: string; // public URL (or signed URL)
-  path?: string; // storage path (삭제/정리용)
-  size?: number; // bytes
-  data?: string; // (legacy only) dataURL(base64)
 }
 
 export interface Comment {
@@ -28,23 +20,21 @@ export interface Post {
   id: string;
   type: BoardType;
   title: string;
-  /** 목록에서는 content를 내려받지 않을 수 있음(경량화) */
-  content?: string;
+  content: string;
   author: string;
-  /** 작성자 식별자(권장: Supabase Auth user.id) */
+  /** 작성자 식별자(조합원: member.id, 관리자: 'admin'). 기존 게시물 호환을 위해 optional */
   authorId?: string;
   createdAt: string;
   views: number;
   imageUrl?: string;
-  /** 목록에서는 attachments를 내려받지 않을 수 있음(경량화) */
   attachments?: PostAttachment[];
   /** (레거시) 게시물 수정/삭제 비밀번호 - 신규 작성에서는 사용하지 않음 */
   password?: string;
-  /** 목록에서는 comments를 내려받지 않을 수 있음(경량화) */
   comments?: Comment[]; // 댓글 목록
   pinned?: boolean; // 상단고정 여부
   pinnedAt?: string | null; // 상단고정 시각(정렬용)
 }
+
 
 export interface Member {
   id: string;
@@ -68,4 +58,22 @@ export interface OfficeItem {
   id: string;
   name: string;
   address: string;
+  phone: string;
+  mapImageUrl: string;
+}
+
+export interface SiteSettings {
+  siteName: string;
+  pointColor: string;
+  heroTitle: string;
+  heroSubtitle: string;
+  heroImageUrl: string; // 하위 호환성을 위해 유지
+  heroImageUrls: string[]; // 슬라이드쇼를 위한 배열
+  fontFamily: string;
+  greetingTitle: string;
+  greetingMessage: string;
+  greetingImageUrl: string;
+  missionItems: string[];
+  history: HistoryItem[];
+  offices: OfficeItem[];
 }

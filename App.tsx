@@ -186,8 +186,7 @@ const App: React.FC = () => {
     }
   }, [isWriting, writingType, activeTab, userRole]);
   
-  const [authUserId, setAuthUserId] = useState<string>('');
-const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
+  const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
   const [posts, setPosts] = useState<Post[]>(INITIAL_POSTS);
   const [deletedPosts, setDeletedPosts] = useState<Post[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
@@ -401,10 +400,6 @@ const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
   useEffect(() => {
     if (!cloud.isSupabaseEnabled()) return;
 
-    // ✅ 현재 Supabase Auth user id 저장(게시글 user_id 저장용)
-    cloud.getAuthSession().then((s) => setAuthUserId(s?.user?.id || '')).catch(() => {});
-
-
     // redirectTo에 ?reset=1 을 붙여두면, 링크 클릭 후 앱이 어떤 화면을 보여줘야 하는지 알 수 있습니다.
     try {
       const url = new URL(window.location.href);
@@ -416,7 +411,6 @@ const [settings, setSettings] = useState<SiteSettings>(INITIAL_SETTINGS);
     }
 
     const { data } = cloud.onAuthStateChange((event) => {
-      cloud.getAuthSession().then((s) => setAuthUserId(s?.user?.id || '')).catch(() => {});
       if (event === 'PASSWORD_RECOVERY') {
         setShowMemberLogin(false);
         setShowForgotPassword(false);
@@ -472,9 +466,7 @@ const invalidateMembersCache = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSavePost = async (title: string, content: string, attachments?: any[], id?: string) => {
-    const session = await cloud.getAuthSession();
-    const sessionUserId = session?.user?.id || undefined;
+  const handleSavePost = async (title: string, content: string, attachments?: PostAttachment[], id?: string) => {
     let targetPost: Post;
     if (id) {
       const existing = posts.find(p => p.id === id);
@@ -482,7 +474,7 @@ const invalidateMembersCache = () => {
       targetPost = { ...existing!, title, content, attachments };
     } else {
       const authorName = userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원');
-      const authorId = sessionUserId || authUserId || (loggedInMember?.id || undefined);
+      const authorId = userRole === 'admin' ? 'admin' : (loggedInMember?.id || undefined);
       targetPost = {
         id: Date.now().toString(),
         type: ((writingType || (activeTab === 'notice' ? 'notice_all' : activeTab)) as BoardType),
@@ -499,20 +491,11 @@ const invalidateMembersCache = () => {
       };
     }
 
-        // ✅ 첨부는 Storage 업로드 후 URL만 저장
-    const prevAttachments = id ? (posts.find(p => p.id === id)?.attachments || []) : [];
-    const preparedAttachments = await cloud.preparePostAttachmentsForSave(attachments, targetPost.id, prevAttachments);
-    targetPost = { ...targetPost, attachments: preparedAttachments };
-
     const newPosts = id ? posts.map(p => p.id === id ? targetPost : p) : [targetPost, ...posts];
     setPosts(newPosts);
     saveToLocal('posts', newPosts);
-    const ok = await cloud.savePostToCloud(targetPost);
-    if (!ok) {
-      alert('저장에 실패했습니다. (Supabase 정책/RLS 또는 user_id 설정 문제)\n\nF12 → Console 에러를 확인해주세요.');
-      return;
-    }
-
+    await cloud.savePostToCloud(targetPost);
+    
     alert('성공적으로 저장되었습니다.');
     setIsWriting(false);
     pushNav({ tab: activeTab, postId: null, writing: false });
@@ -1044,34 +1027,20 @@ await cloud.deleteMemberFromCloud(user.id);
     pushNav({ tab: activeTab, postId: null, writing: true });
   };
 
-  const handleSelectPost = async (id: string | null) => {
+  const handleSelectPost = (id: string | null) => {
     setSelectedPostId(id);
     pushNav({ tab: activeTab, postId: id, writing: false });
     if (id) {
-      // ✅ 상세 데이터가 없으면(경량 목록에서 선택된 경우) 1건만 추가 로드
-      const cur = posts.find(p => p.id === id);
-      if (cur && (!cur.content || !cur.comments || !cur.attachments)) {
-        const full = await cloud.fetchPostByIdFromCloud(id);
-        if (full) {
-          setPosts(prev => prev.map(p => (p.id === id ? { ...p, ...full } : p)));
-        }
-      }
-
-      // ✅ 조회수는 가볍게 update만
-      setPosts(prev => prev.map(p => {
+      const updatedPosts = posts.map(p => {
         if (p.id === id) {
-          const nextViews = (p.views || 0) + 1;
-          cloud.incrementPostViewsInCloud(id, nextViews);
-          return { ...p, views: nextViews };
+          const updated = { ...p, views: (p.views || 0) + 1 };
+          cloud.savePostToCloud(updated);
+          return updated;
         }
         return p;
-      }));
-
-      // local cache도 업데이트(실패해도 무시)
-      try {
-        const next = posts.map(p => p.id === id ? { ...p, views: (p.views || 0) + 1 } : p);
-        saveToLocal('posts', next);
-      } catch {}
+      });
+      setPosts(updatedPosts);
+      saveToLocal('posts', updatedPosts);
     }
   };
 
@@ -1084,10 +1053,6 @@ await cloud.deleteMemberFromCloud(user.id);
 
   useEffect(() => {
     if (!cloud.isSupabaseEnabled()) return;
-
-    // ✅ 현재 Supabase Auth user id 저장(게시글 user_id 저장용)
-    cloud.getAuthSession().then((s) => setAuthUserId(s?.user?.id || '')).catch(() => {});
-
   
     const refresh = () => syncData(false);
   
@@ -1206,7 +1171,7 @@ await cloud.deleteMemberFromCloud(user.id);
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
                 currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')}
-                currentUserId={userRole === 'admin' ? (authUserId || '') : (loggedInMember?.id || '')}
+                currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
               />
             </div>
           </>
@@ -1227,7 +1192,7 @@ await cloud.deleteMemberFromCloud(user.id);
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
                 currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')}
-                currentUserId={userRole === 'admin' ? (authUserId || '') : (loggedInMember?.id || '')}
+                currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
               />
             </div>
 
@@ -1246,7 +1211,7 @@ await cloud.deleteMemberFromCloud(user.id);
                 onEditComment={handleEditComment}
                 onDeleteComment={handleDeleteComment}
                 currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')}
-                currentUserId={userRole === 'admin' ? (authUserId || '') : (loggedInMember?.id || '')}
+                currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
               />
             </div>
           </>
@@ -1267,7 +1232,7 @@ await cloud.deleteMemberFromCloud(user.id);
               onEditComment={handleEditComment}
               onDeleteComment={handleDeleteComment}
               currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')} 
-              currentUserId={userRole === 'admin' ? (authUserId || '') : (loggedInMember?.id || '')}
+              currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
             />
           </div>
         )}

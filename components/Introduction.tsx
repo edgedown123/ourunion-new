@@ -8,19 +8,6 @@ interface IntroductionProps {
 }
 
 const Introduction: React.FC<IntroductionProps> = ({ settings, activeTab }) => {
-  const getHistoryTimestamp = (yearText: string) => {
-    const m = yearText.match(/(\d{4})\s*년(?:\s*(\d{1,2})\s*월)?(?:\s*(\d{1,2})\s*일)?/);
-    if (!m) return -Infinity;
-    const y = parseInt(m[1], 10);
-    const mo = m[2] ? parseInt(m[2], 10) : 1;
-    const d = m[3] ? parseInt(m[3], 10) : 1;
-    return Date.UTC(y, Math.max(0, mo - 1), Math.max(1, d));
-  };
-
-  const sortedHistory = [...(settings.history || [])].sort(
-    (a, b) => getHistoryTimestamp(b.year) - getHistoryTimestamp(a.year)
-  );
-
   if (activeTab === 'map') {
     return (
       <div className="max-w-5xl mx-auto py-12 px-4">
@@ -113,8 +100,8 @@ const Introduction: React.FC<IntroductionProps> = ({ settings, activeTab }) => {
         <div className="bg-sky-50 rounded-[3rem] p-8 sm:p-12">
           <h3 className="text-2xl font-bold text-gray-800 mb-8 text-center">주요 연혁</h3>
           <div className="space-y-8">
-            {sortedHistory && sortedHistory.length > 0 ? (
-              sortedHistory.map((item, idx) => (
+            {settings.history && settings.history.length > 0 ? (
+              settings.history.map((item, idx) => (
                 <div key={idx} className="flex border-l-2 border-sky-primary pl-6 relative">
                   <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-sky-primary border-4 border-white shadow-sm"></div>
                   <div className="pb-2">

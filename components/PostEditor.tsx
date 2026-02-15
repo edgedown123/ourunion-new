@@ -4,7 +4,7 @@ import { BoardType, PostAttachment, Post } from '../types';
 interface PostEditorProps {
   type: BoardType;
   initialPost?: Post | null;
-  onSave: (title: string, content: string, attachments?: any[], id?: string) => void;
+  onSave: (title: string, content: string, attachments?: PostAttachment[], id?: string) => void;
   onCancel: () => void;
 }
 
@@ -47,13 +47,41 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     return `${size.toFixed(fixed)}${units[idx]}`;
   };
 
-  // ✅ Storage 업로드 전 단계(작성 화면)에서는
-  // - 파일은 File 객체로 보관
-  // - 미리보기는 blob:ObjectURL 사용
-  type DraftAttachment = PostAttachment & { file?: File; isNew?: boolean };
+  const compressImage = (base64Str: string, maxWidth = 1200): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = base64Str;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = (maxWidth / width) * height;
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.7));
+      };
+    });
+  };
+
+  // dataURL( base64 ) 대략 용량 계산 (서버에 저장된 데이터 기준)
+  const dataUrlToBytes = (dataUrl: string): number => {
+    const commaIdx = dataUrl.indexOf(',');
+    if (commaIdx === -1) return 0;
+    const base64 = dataUrl.slice(commaIdx + 1);
+    // base64 size -> bytes
+    let padding = 0;
+    if (base64.endsWith('==')) padding = 2;
+    else if (base64.endsWith('=')) padding = 1;
+    return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+  };
 
   const getExistingTotalBytes = () => {
-    return attachments.reduce((sum, a: any) => sum + (a.size || 0), 0);
+    return attachments.reduce((sum, a) => sum + dataUrlToBytes(a.data), 0);
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,7 +89,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     if (!files) return;
 
     const selected = Array.from(files);
-    const currentImages = attachments.filter((a: any) => a.type?.startsWith('image/')).length;
+    const currentImages = attachments.filter(a => a.type?.startsWith('image/')).length;
     const currentDocs = attachments.length - currentImages;
     const selectedImages = selected.filter(f => f.type?.startsWith('image/')).length;
     const selectedDocs = selected.length - selectedImages;
@@ -91,47 +119,41 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
       alert(`첨부파일 총합은 최대 15MB까지만 가능합니다. (현재 약 ${formatFileSize(existingTotal)} + 선택 ${formatFileSize(selectedTotal)})`);
       return;
     }
-
-    // ✅ DraftAttachment로 보관 (file 포함)
-    for (const file of selected) {
-      const previewUrl = URL.createObjectURL(file);
-      setAttachments((prev: any[]) => {
-        const imageIndex = file.type?.startsWith('image/')
-          ? prev.filter((p: any) => p.type?.startsWith('image/')).length
-          : -1;
-
-        const next = [
-          ...prev,
-          {
-            name: file.name,
-            type: file.type,
-            url: previewUrl,
-            size: file.size,
-            file,
-            isNew: true,
-          } as DraftAttachment,
-        ];
-
-        if (imageIndex >= 0 && contentRef.current) {
-          insertImageTokenAtCursor(`[[img:${imageIndex}]]`);
+    const processFile = async (file: File) => {
+      if (file.size > MAX_FILE_SIZE) {
+        alert(`${file.name}: 파일 용량은 5MB 이하만 가능합니다.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        let fileData = reader.result as string;
+        if (file.type?.startsWith('image/')) {
+          fileData = await compressImage(fileData);
         }
-        return next;
-      });
-    }
+        setAttachments(prev => {
+          const imageIndex = file.type?.startsWith('image/')
+            ? prev.filter(p => p.type?.startsWith('image/')).length
+            : -1;
+          const next = [...prev, { name: file.name, data: fileData, type: file.type }];
 
+          // 글쓰기 textarea가 마운트된 경우에만 커서 위치에 토큰 삽입
+          if (imageIndex >= 0 && contentRef.current) {
+            insertImageTokenAtCursor(`[[img:${imageIndex}]]`);
+          }
+          return next;
+        });
+      };
+      reader.readAsDataURL(file);
+    };
+    
+    for (const file of Array.from(files) as File[]) {
+      await processFile(file);
+    }
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const removeAttachment = (index: number) => {
-    setAttachments((prev: any[]) => {
-      const target = prev[index];
-      try {
-        if (target?.isNew && typeof target?.url === 'string' && target.url.startsWith('blob:')) {
-          URL.revokeObjectURL(target.url);
-        }
-      } catch {}
-      return prev.filter((_: any, i: number) => i !== index);
-    });
+    setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
 
@@ -194,7 +216,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
               <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-lg border shadow-sm">
                 <div className="flex items-center">
                   {file.type?.startsWith('image/') ? (
-                    <img src={(file as any).url || (file as any).data} alt="preview" className="w-10 h-10 object-cover rounded mr-3" />
+                    <img src={file.data} alt="preview" className="w-10 h-10 object-cover rounded mr-3" />
                   ) : (
                     <div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center mr-3">
                       <i className={`fas ${file.type?.startsWith('video/') ? 'fa-video' : 'fa-file'} text-gray-400`}></i>
@@ -202,7 +224,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
                   )}
                   <div className="text-xs">
                     <p className="font-medium text-gray-800 truncate max-w-[200px]">{file.name}</p>
-                    <p className="text-gray-400">{(((file as any).size || 0) / 1024).toFixed(1)} KB {file.type?.startsWith('image/') && <span className="text-emerald-500 font-bold ml-1">(최적화됨)</span>}</p>
+                    <p className="text-gray-400">{(file.data.length * 0.75 / 1024).toFixed(1)} KB {file.type?.startsWith('image/') && <span className="text-emerald-500 font-bold ml-1">(최적화됨)</span>}</p>
                   </div>
                 </div>
                 <button onClick={() => removeAttachment(idx)} className="text-red-400 hover:text-red-600 p-2 transition-colors">
