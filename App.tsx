@@ -482,7 +482,6 @@ const invalidateMembersCache = () => {
         content,
         author: authorName,
         authorId,
-        userId: loggedInMember?.id || undefined,
         createdAt: new Date().toISOString(),
         views: 0,
         attachments: attachments,
