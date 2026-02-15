@@ -1065,30 +1065,13 @@ await cloud.deleteMemberFromCloud(user.id);
 
       // 2) 상세 화면에서 필요한 큰 필드(content/attachments/comments)는 단건으로 추가 로드
       if (cloud.isSupabaseEnabled()) {
-        cloud.fetchPostMainByIdFromCloud(id).then((full) => {
+        cloud.fetchPostByIdFromCloud(id).then((full) => {
           if (!full) return;
           setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, ...full } : p)));
         }).catch(() => {});
       }
     }
   };
-
-  const handleLoadPostExtras = async (id: string) => {
-    if (!cloud.isSupabaseEnabled()) return;
-    try {
-      const extras = await cloud.fetchPostExtrasByIdFromCloud(id);
-      if (!extras) return;
-      setPosts((prev) => {
-        const updated = prev.map((p) => (p.id === id ? { ...p, ...extras } : p));
-        saveToLocal('posts', updated);
-        return updated;
-      });
-    } catch (e) {
-      // ignore
-    }
-  };
-
-
 
   const handleViewPostFromAdmin = (postId: string, type: BoardType) => {
     setActiveTab(type);
@@ -1271,7 +1254,6 @@ await cloud.deleteMemberFromCloud(user.id);
               onEditClick={handleEditClick} 
               selectedPostId={selectedPostId} 
               onSelectPost={handleSelectPost} 
-              onLoadPostExtras={handleLoadPostExtras}
               userRole={userRole} 
               onDeletePost={handleDeletePost} 
               onTogglePin={handleTogglePinPost}
