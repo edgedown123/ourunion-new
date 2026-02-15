@@ -335,18 +335,36 @@ const App: React.FC = () => {
 
     try {
       if (cloud.isSupabaseEnabled()) {
-        const [pData, mData, sData] = await Promise.all([
-          cloud.fetchPostsFromCloud(),
-          cloud.fetchMembersFromCloud(),
-          cloud.fetchSettingsFromCloud(),
-        ]);
+        // NOTE:
+        // - site_settings.data can become very large if an image (base64) is stored in it.
+        // - Our app refreshes on focus/visibility to keep posts/members up to date.
+        //   We MUST avoid re-downloading heavy settings on every refresh.
 
-        if (pData) setPosts(pData);
-        if (mData) {
-          setMembers(mData);
-          localStorage.setItem('union_members', JSON.stringify(mData));
+        if (showLoading || !settings) {
+          const [pData, mData, sData] = await Promise.all([
+            cloud.fetchPostsFromCloud(),
+            cloud.fetchMembersFromCloud(),
+            cloud.fetchSettingsFromCloud(),
+          ]);
+
+          if (pData) setPosts(pData);
+          if (mData) {
+            setMembers(mData);
+            localStorage.setItem('union_members', JSON.stringify(mData));
+          }
+          if (sData) setSettings(sData);
+        } else {
+          // Lightweight refresh (posts + members only)
+          const [pData, mData] = await Promise.all([
+            cloud.fetchPostsFromCloud(),
+            cloud.fetchMembersFromCloud(),
+          ]);
+          if (pData) setPosts(pData);
+          if (mData) {
+            setMembers(mData);
+            localStorage.setItem('union_members', JSON.stringify(mData));
+          }
         }
-        if (sData) setSettings(sData);
       } else {
         const sPosts = localStorage.getItem('union_posts');
         const sMembers = localStorage.getItem('union_members');

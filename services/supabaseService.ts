@@ -105,7 +105,7 @@ export const fetchPostsFromCloud = async (): Promise<Post[] | null> => {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select('id, type, title, author, authorId, created_at, views, pinned, pinned_at')
+      .select('id, type, title, author, created_at, views, pinned, pinned_at')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -129,7 +129,7 @@ export const fetchPostByIdFromCloud = async (id: string): Promise<Post | null> =
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select('id, type, title, content, author, authorId, created_at, views, attachments, password, comments, pinned, pinned_at')
+      .select('id, type, title, content, author, created_at, views, attachments, password, comments, pinned, pinned_at')
       .eq('id', id)
       .single();
 
@@ -270,8 +270,32 @@ export const deleteMemberFromCloud = async (id: string) => {
 // --------------------------------------
 // 사이트 설정 동기화
 // --------------------------------------
+// Settings cache: avoid repeatedly downloading large site_settings payloads.
+let __settingsCache: { ts: number; value: SiteSettings | null } | null = null;
+const SETTINGS_CACHE_KEY = 'union_settings';
+const SETTINGS_CACHE_TS_KEY = 'union_settings_ts';
+const SETTINGS_CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 export const fetchSettingsFromCloud = async (): Promise<SiteSettings | null> => {
   if (!supabase) return null;
+
+  // 0) Memory/localStorage cache first
+  try {
+    const now = Date.now();
+    if (__settingsCache && now - __settingsCache.ts < SETTINGS_CACHE_TTL_MS) {
+      return __settingsCache.value;
+    }
+    const tsRaw = localStorage.getItem(SETTINGS_CACHE_TS_KEY);
+    const cachedRaw = localStorage.getItem(SETTINGS_CACHE_KEY);
+    const ts = tsRaw ? Number(tsRaw) : 0;
+    if (cachedRaw && ts && now - ts < SETTINGS_CACHE_TTL_MS) {
+      const parsed = JSON.parse(cachedRaw) as SiteSettings;
+      __settingsCache = { ts, value: parsed };
+      return parsed;
+    }
+  } catch {
+    // ignore cache failures
+  }
 
   // 1) Prefer site_settings(id='main') if exists (matches your current DB)
   try {
@@ -289,7 +313,15 @@ export const fetchSettingsFromCloud = async (): Promise<SiteSettings | null> => 
         ...(data.main_slogan ? { heroTitle: data.main_slogan } : {}),
         ...(data.sub_slogan ? { heroSubtitle: data.sub_slogan } : {}),
       };
-      return merged as SiteSettings;
+      const result = merged as SiteSettings;
+      try {
+        __settingsCache = { ts: Date.now(), value: result };
+        localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(result));
+        localStorage.setItem(SETTINGS_CACHE_TS_KEY, String(Date.now()));
+      } catch {
+        // ignore
+      }
+      return result;
     }
   } catch {
     // ignore and fallback
@@ -304,7 +336,15 @@ export const fetchSettingsFromCloud = async (): Promise<SiteSettings | null> => 
       .single();
 
     if (error) throw error;
-    return (data?.data ?? null) as SiteSettings | null;
+    const result = (data?.data ?? null) as SiteSettings | null;
+    try {
+      __settingsCache = { ts: Date.now(), value: result };
+      if (result) localStorage.setItem(SETTINGS_CACHE_KEY, JSON.stringify(result));
+      localStorage.setItem(SETTINGS_CACHE_TS_KEY, String(Date.now()));
+    } catch {
+      // ignore
+    }
+    return result;
   } catch (err) {
     console.error('클라우드 설정 로드 실패:', err);
     return null;
