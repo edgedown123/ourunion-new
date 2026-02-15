@@ -473,6 +473,8 @@ const invalidateMembersCache = () => {
   };
 
   const handleSavePost = async (title: string, content: string, attachments?: any[], id?: string) => {
+    const session = await cloud.getAuthSession();
+    const sessionUserId = session?.user?.id || undefined;
     let targetPost: Post;
     if (id) {
       const existing = posts.find(p => p.id === id);
