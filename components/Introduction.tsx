@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { SiteSettings } from '../types';
 
 interface IntroductionProps {
@@ -9,7 +9,22 @@ interface IntroductionProps {
 
 const Introduction: React.FC<IntroductionProps> = ({ settings, activeTab }) => {
   if (activeTab === 'map') {
-    return (
+    
+  // 연혁 정렬: 날짜(연-월-일) 기준 내림차순
+  const sortedHistory = useMemo(() => {
+    const items = Array.isArray(settings.history) ? [...settings.history] : [];
+    const parseKey = (s: string) => {
+      const nums = (s || '').match(/\d+/g) || [];
+      const y = nums[0] ? parseInt(nums[0], 10) : 0;
+      const m = nums[1] ? parseInt(nums[1], 10) : 0;
+      const d = nums[2] ? parseInt(nums[2], 10) : 0;
+      return y * 10000 + m * 100 + d;
+    };
+    items.sort((a, b) => parseKey(b.year) - parseKey(a.year));
+    return items;
+  }, [settings.history]);
+
+return (
       <div className="max-w-5xl mx-auto py-12 px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">찾아오시는 길</h2>
@@ -101,7 +116,7 @@ const Introduction: React.FC<IntroductionProps> = ({ settings, activeTab }) => {
           <h3 className="text-2xl font-bold text-gray-800 mb-8 text-center">주요 연혁</h3>
           <div className="space-y-8">
             {settings.history && settings.history.length > 0 ? (
-              settings.history.map((item, idx) => (
+              sortedHistory.map((item, idx) => (
                 <div key={idx} className="flex border-l-2 border-sky-primary pl-6 relative">
                   <div className="absolute -left-2 top-0 w-4 h-4 rounded-full bg-sky-primary border-4 border-white shadow-sm"></div>
                   <div className="pb-2">

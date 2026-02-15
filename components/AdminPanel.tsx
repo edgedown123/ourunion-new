@@ -273,12 +273,46 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
-  const handleAddHistory = () => {
+  
+  // 연혁 정렬: 날짜(연-월-일) 기준 내림차순
+  const parseHistoryKey = (yearStr: string) => {
+    // 지원 포맷 예: "2026년 01월 29일", "2026년 1월", "2026년"
+    const nums = (yearStr || '').match(/\d+/g) || [];
+    const y = nums[0] ? parseInt(nums[0], 10) : 0;
+    const m = nums[1] ? parseInt(nums[1], 10) : 0;
+    const d = nums[2] ? parseInt(nums[2], 10) : 0;
+    // 비교용 정수키 (YYYYMMDD)
+    return y * 10000 + m * 100 + d;
+  };
+
+  const sortHistoryItems = (items: any[]) => {
+    const arr = Array.isArray(items) ? [...items] : [];
+    arr.sort((a, b) => {
+      const ak = parseHistoryKey(a?.year ?? '');
+      const bk = parseHistoryKey(b?.year ?? '');
+      if (bk !== ak) return bk - ak; // 최신이 위
+      // 날짜가 같으면 text로 안정 정렬
+      return String(a?.text ?? '').localeCompare(String(b?.text ?? ''));
+    });
+    return arr;
+  };
+
+  // settings.history가 날짜순으로 유지되도록 한번 정렬(루프 방지 위해 비교 후 반영)
+  useEffect(() => {
+    const current = Array.isArray(settings.history) ? settings.history : [];
+    const sorted = sortHistoryItems(current);
+    if (JSON.stringify(sorted) !== JSON.stringify(current)) {
+      setSettings({ ...settings, history: sorted });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.history]);
+
+const handleAddHistory = () => {
     if (!newYear || !newText) return alert('연도와 내용은 필수로 입력해주세요.');
     let dateStr = `${newYear}년`;
     if (newMonth) dateStr += ` ${newMonth}월`;
     if (newDay) dateStr += ` ${newDay}일`;
-    const updatedHistory = [{ year: dateStr, text: newText }, ...(settings.history || [])];
+    const updatedHistory = sortHistoryItems([{ year: dateStr, text: newText }, ...(settings.history || [])]);
     setSettings({ ...settings, history: updatedHistory });
     setNewYear(''); setNewMonth(''); setNewDay(''); setNewText('');
   };
