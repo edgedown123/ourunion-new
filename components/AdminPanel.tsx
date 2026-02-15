@@ -99,8 +99,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // -----------------------------
   // 첨부파일(게시글 attachments) 사용량 계산
-  // - attachments.data 는 dataURL(base64) 형태로 저장됩니다.
-  // - base64를 실제로 디코딩하지 않고 길이로 대략 바이트를 계산합니다.
+  // - (과거) attachments.data(dataURL/base64) 저장 방식이 있었으나, 현재는 Storage URL 방식입니다.
+  // - size가 없고 legacy dataURL이 있을 때만 base64 길이로 대략 바이트를 계산합니다.
   // -----------------------------
   const dataUrlToBytes = (dataUrl: string): number => {
     if (!dataUrl) return 0;
@@ -125,10 +125,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     return `${size.toFixed(fixed)}${units[idx]}`;
   };
 
-  const downloadDataUrl = (dataUrl: string, filename: string) => {
+  const downloadFile = (url: string, filename: string) => {
     try {
       const link = document.createElement('a');
-      link.href = dataUrl;
+      link.href = url;
       link.download = filename || 'download';
       document.body.appendChild(link);
       link.click();
@@ -167,7 +167,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     for (const p of posts || []) {
       const list = p.attachments || [];
       for (const a of list) {
-        const bytes = dataUrlToBytes(a.data);
+        const bytes = (a as any).size ?? dataUrlToBytes((a as any).data || '');
         rows.push({
           postId: p.id,
           postTitle: p.title,
@@ -176,7 +176,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           fileName: a.name,
           mime: a.type,
           bytes,
-          dataUrl: a.data,
+          url: (a as any).url || (a as any).data || '',
         });
       }
     }
@@ -929,7 +929,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                               <td className="py-3 pr-3 text-right font-black text-gray-900 whitespace-nowrap">{formatFileSize(f.bytes)}</td>
                               <td className="py-3 text-right">
                                 <button
-                                  onClick={() => downloadDataUrl(f.dataUrl, f.fileName)}
+                                  onClick={() => downloadFile((f as any).url, f.fileName)}
                                   className="px-3 py-2 bg-sky-primary text-white rounded-xl font-black text-xs hover:opacity-90 transition-all whitespace-nowrap"
                                 >
                                   다운로드
