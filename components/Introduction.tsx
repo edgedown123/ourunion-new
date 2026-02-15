@@ -8,8 +8,6 @@ interface IntroductionProps {
 }
 
 const Introduction: React.FC<IntroductionProps> = ({ settings, activeTab }) => {
-  if (activeTab === 'map') {
-    
   // 연혁 정렬: 날짜(연-월-일) 기준 내림차순
   const sortedHistory = useMemo(() => {
     const items = Array.isArray(settings.history) ? [...settings.history] : [];
@@ -24,7 +22,8 @@ const Introduction: React.FC<IntroductionProps> = ({ settings, activeTab }) => {
     return items;
   }, [settings.history]);
 
-return (
+    if (activeTab === 'map') {
+    return (
       <div className="max-w-5xl mx-auto py-12 px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">찾아오시는 길</h2>

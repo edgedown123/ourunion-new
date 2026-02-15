@@ -764,9 +764,6 @@ const renderContentWithInlineImages = (raw?: unknown) => {
                     )}
                     <div className="flex justify-between items-center">
                       <p className="font-bold text-gray-700 truncate group-hover:text-sky-primary transition-colors flex-1 mr-4 flex items-center gap-2">
-                        {post.pinned && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-200/60 text-yellow-900 font-black border border-yellow-300/60">📌 상단고정</span>
-                        )}
                         <span className="truncate">{post.title}</span>
                       </p>
                       <span className="text-[11px] text-gray-300 font-black whitespace-nowrap">{formatDate(post.createdAt)}</span>
@@ -846,9 +843,6 @@ const renderContentWithInlineImages = (raw?: unknown) => {
                       <div className="flex-1 pr-4">
                         <p className={`${isCompactList ? 'text-base md:text-xl' : 'text-lg md:text-xl'} font-black text-gray-800 truncate group-hover:text-sky-primary transition-colors flex items-center gap-2`}
                           >
-                            {post.pinned && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-200/60 text-yellow-900 font-black border border-yellow-300/60">📌 상단고정</span>
-                            )}
                             <span className="truncate">{post.title}</span>
                           </p>
                         <div className={`${isCompactList ? 'mt-1' : 'mt-3'} flex items-center space-x-4 text-xs md:text-sm text-gray-400 font-bold uppercase tracking-wider`}>
