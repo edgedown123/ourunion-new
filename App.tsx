@@ -1030,17 +1030,28 @@ await cloud.deleteMemberFromCloud(user.id);
   const handleSelectPost = (id: string | null) => {
     setSelectedPostId(id);
     pushNav({ tab: activeTab, postId: id, writing: false });
+
     if (id) {
+      // 1) UI에서 즉시 조회수 반영
       const updatedPosts = posts.map(p => {
         if (p.id === id) {
           const updated = { ...p, views: (p.views || 0) + 1 };
-          cloud.savePostToCloud(updated);
+          // ✅ 조회수만 가볍게 업데이트 (전체 row upsert 금지: 트래픽 폭증 원인)
+          cloud.updatePostViewsInCloud(id, updated.views || 0);
           return updated;
         }
         return p;
       });
       setPosts(updatedPosts);
       saveToLocal('posts', updatedPosts);
+
+      // 2) 상세 화면에서 필요한 큰 필드(content/attachments/comments)는 단건으로 추가 로드
+      if (cloud.isSupabaseEnabled()) {
+        cloud.fetchPostByIdFromCloud(id).then((full) => {
+          if (!full) return;
+          setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, ...full } : p)));
+        }).catch(() => {});
+      }
     }
   };
 

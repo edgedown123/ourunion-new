@@ -105,7 +105,7 @@ export const fetchPostsFromCloud = async (): Promise<Post[] | null> => {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select('*')
+      .select('id, type, title, author, authorId, created_at, views, pinned, pinned_at')
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -119,6 +119,46 @@ export const fetchPostsFromCloud = async (): Promise<Post[] | null> => {
   } catch (err) {
     console.error('클라우드 게시글 로드 실패:', err);
     return null;
+  }
+};
+
+
+
+export const fetchPostByIdFromCloud = async (id: string): Promise<Post | null> => {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('posts')
+      .select('id, type, title, content, author, authorId, created_at, views, attachments, password, comments, pinned, pinned_at')
+      .eq('id', id)
+      .single();
+
+    if (error) throw error;
+    if (!data) return null;
+
+    const p: any = data;
+    return {
+      ...p,
+      createdAt: p.created_at || p.createdAt,
+      pinned: p.pinned ?? false,
+      pinnedAt: p.pinned_at ?? p.pinnedAt ?? null,
+    } as Post;
+  } catch (err) {
+    console.error('클라우드 게시글 단건 조회 실패:', err);
+    return null;
+  }
+};
+
+export const updatePostViewsInCloud = async (id: string, views: number) => {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('posts')
+      .update({ views })
+      .eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('클라우드 조회수 업데이트 실패:', err);
   }
 };
 
