@@ -457,9 +457,7 @@ const formatFileSize = (bytes: number) => {
             ))}
           </div>
         </div>
-
         <div className="flex justify-end space-x-3 pt-4">
-<div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
             onClick={() => onSave(title, blocksToContent(blocks), attachments, initialPost?.id)}
