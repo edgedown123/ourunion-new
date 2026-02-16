@@ -302,7 +302,7 @@ const Board: React.FC<BoardProps> = ({
     };
 
 
-const renderContentWithInlineImages = (raw?: unknown) => {
+const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[]; used: Set<number> } => {
   // Supabase/레거시 데이터에서 content가 null/undefined로 들어올 수 있어 안전 처리
   const safeRaw =
     typeof raw === 'string'
@@ -316,6 +316,7 @@ const renderContentWithInlineImages = (raw?: unknown) => {
 
     const parts = safeRaw.split(/\[\[(img|file):(\d+)\]\]/g);
     const nodes: React.ReactNode[] = [];
+    const used = new Set<number>();
 
     for (let i = 0; i < parts.length; ) {
       const text = parts[i++] ?? '';
@@ -335,6 +336,7 @@ const renderContentWithInlineImages = (raw?: unknown) => {
 
         if (kind === 'img') {
           if (!Number.isNaN(idx) && imageAttachments?.[idx]) {
+            used.add(idx);
             nodes.push(
               <div
                 key={`img-${i}`}
@@ -423,7 +425,7 @@ const renderContentWithInlineImages = (raw?: unknown) => {
       );
     }
 
-    return nodes;
+    return { nodes, used };
   } catch (e) {
     console.error('[Board] renderContentWithInlineImages failed:', e);
     return {
@@ -435,7 +437,10 @@ const renderContentWithInlineImages = (raw?: unknown) => {
       used: new Set<number>(),
     };
   }
-};    const isNoticeCategory = selectedPost.type === 'notice_all' || selectedPost.type === 'family_events';
+};
+
+    const rendered = renderContentWithInlineImages(selectedPost.content);
+    const isNoticeCategory = selectedPost.type === 'notice_all' || selectedPost.type === 'family_events';
 
     return (
       <div className="max-w-4xl mx-auto py-8 px-2 sm:px-5 animate-fadeIn">
@@ -502,12 +507,11 @@ const renderContentWithInlineImages = (raw?: unknown) => {
           </header>
 
           <div className="prose prose-sky max-w-none text-gray-700 leading-relaxed min-h-[120px] md:min-h-[200px] text-base md:text-lg prose-p:my-3">
-            {renderContentWithInlineImages(selectedPost.content).nodes}
+            {rendered.nodes}
           </div>
 
           {(() => {
-            const { used } = renderContentWithInlineImages(selectedPost.content);
-            const remaining = imageAttachments.filter((_, idx) => !used.has(idx));
+            const remaining = imageAttachments.filter((_, idx) => !rendered.used.has(idx));
             if (remaining.length === 0) return null;
             return (
               <div className="mt-14 space-y-8">
