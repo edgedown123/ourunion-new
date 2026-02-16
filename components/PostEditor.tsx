@@ -280,6 +280,34 @@ const formatFileSize = (bytes: number) => {
 
   const getImageAttachments = () => attachments.filter(isImageAttachment);
 
+  const removeImageByImgIndex = (imgIndex: number) => {
+    // imgIndex는 "이미지들만" 기준 인덱스
+    setAttachments(prev => {
+      const images = prev.filter(isImageAttachment);
+      const nonImages = prev.filter(a => !isImageAttachment(a));
+      const target = images[imgIndex];
+      if (!target) return prev;
+      const nextImages = images.filter((_, i) => i !== imgIndex);
+      return [...nextImages, ...nonImages];
+    });
+
+    setBlocks(prev => {
+      const next: EditorBlock[] = [];
+      for (const b of prev) {
+        if (b.kind === 'img') {
+          if (b.imgIndex === imgIndex) continue; // 해당 이미지 블록 제거
+          if (b.imgIndex > imgIndex) next.push({ ...b, imgIndex: b.imgIndex - 1 }); // 뒤 인덱스 당김
+          else next.push(b);
+        } else {
+          next.push(b);
+        }
+      }
+      // 최소 1개 텍스트 블록 유지
+      if (next.length === 0) return [{ kind: 'text', id: 't0', value: '' }];
+      return next;
+    });
+  };
+
   return (
     <div className="max-w-4xl mx-auto py-8 px-4"> 
 
@@ -363,36 +391,75 @@ const formatFileSize = (bytes: number) => {
           )}
         </div>
 
+        
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
-          
-            <div className="border rounded-lg p-3 bg-white">
-              {blocks.map((b, idx) => (
-                <div
-                  key={b.id}
-                  className="mb-3 last:mb-0"
-                  draggable
-                  onDragStart={() => setDragBlockIndex(idx)}
-                  
 
-                  {/* 텍스트 추가 버튼 (블록 사이에 문단 추가 가능) */}
-                  <div className="flex gap-2 mt-2">
+          <div className="border rounded-lg p-3 bg-white">
+            {blocks.map((b, idx) => (
+              <div
+                key={b.id}
+                className="mb-3 last:mb-0 border rounded-md p-2 bg-gray-50"
+                draggable
+                onDragStart={() => setDragBlockIndex(idx)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={() => {
+                  if (dragBlockIndex === null) return;
+                  reorderBlocks(dragBlockIndex, idx);
+                  setDragBlockIndex(null);
+                }}
+                onDragEnd={() => setDragBlockIndex(null)}
+                style={{ touchAction: 'none' }}
+                title="드래그해서 위치를 바꿀 수 있어요"
+              >
+                {b.kind === 'text' ? (
+                  <textarea
+                    className="w-full min-h-[90px] p-2 border rounded bg-white"
+                    value={b.value}
+                    onChange={(e) => updateTextBlock(b.id, e.target.value)}
+                    placeholder="내용을 입력하세요"
+                  />
+                ) : (
+                  <div className="relative">
+                    <img
+                      src={getImageAttachments()[b.imgIndex]?.data || ''}
+                      alt={getImageAttachments()[b.imgIndex]?.name || `img-${b.imgIndex}`}
+                      className="w-full max-h-64 object-contain rounded bg-white border"
+                      loading="lazy"
+                    />
                     <button
                       type="button"
-                      className="text-xs px-3 py-1 rounded border bg-gray-50"
-                      onClick={() => insertTextBlockAfter(idx)}
+                      className="absolute top-2 right-2 bg-white/90 rounded-full w-8 h-8 flex items-center justify-center text-red-500 border"
+                      onClick={() => removeImageByImgIndex(b.imgIndex)}
+                      aria-label="이미지 삭제"
+                      title="이미지 삭제"
                     >
-                      + 텍스트 추가
+                      ✕
                     </button>
-                    <div className="text-xs text-gray-400 self-center">블록을 드래그하면 위치가 바뀝니다</div>
+                    <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
+                      이미지 {b.imgIndex + 1}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                )}
 
+                {/* 텍스트 추가 버튼 (블록 사이에 문단 추가 가능) */}
+                <div className="flex gap-2 mt-2 items-center">
+                  <button
+                    type="button"
+                    className="text-xs px-3 py-1 rounded border bg-gray-50"
+                    onClick={() => insertTextBlockAfter(idx)}
+                  >
+                    + 텍스트 추가
+                  </button>
+                  <div className="text-xs text-gray-400">블록을 드래그하면 위치가 바뀝니다</div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="flex justify-end space-x-3 pt-4">
+<div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
             onClick={() => onSave(title, blocksToContent(blocks), attachments, initialPost?.id)}
