@@ -172,10 +172,10 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     });
   };
 
-  const insertImageIntoEditor = (imgIndex: number) => {
+  const insertImageIntoEditor = (imgIndex: number, dataOverride?: string) => {
     const el = editorRef.current;
     if (!el) return;
-    const imgData = getImageAttachments()[imgIndex]?.data;
+    const imgData = dataOverride || getImageAttachments()[imgIndex]?.data;
     if (!imgData) return;
 
     const img = document.createElement('img');
@@ -299,7 +299,9 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
 
                     // ✅ 본문 편집기 커서 위치에 이미지 미리보기 삽입
           if (imageIndex >= 0) {
-            requestAnimationFrame(() => insertImageIntoEditor(imageIndex));
+            // 편집기에 포커스가 없으면 끝에 붙을 수 있어 포커스 보장
+            editorRef.current?.focus?.();
+            requestAnimationFrame(() => insertImageIntoEditor(imageIndex, fileData));
           }
           return next;
         });
