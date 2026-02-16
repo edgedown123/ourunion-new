@@ -250,18 +250,30 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           {attachments.length < MAX_TOTAL_FILES ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className={`w-full text-gray-400 text-sm hover:text-sky-primary hover:bg-white transition-all rounded-lg border border-dashed border-gray-300 flex items-center justify-center ${isMobile ? "py-4 flex-row gap-2" : "py-6 flex-col"}`}
+              className={`w-full text-gray-400 text-sm hover:text-sky-primary hover:bg-white transition-all rounded-lg border border-dashed border-gray-300 flex items-center justify-center ${isMobile ? "py-4 flex-col" : "py-6 flex-col"}`}
             >
-              <i className={`fas fa-plus-circle text-2xl ${isMobile ? "" : "mb-2"}`}></i>
-              <span>
-                {isMobile
-                  ? (<>사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES}  문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES}</>)
-                  : (<>클릭하여 파일을 추가하세요 (현재 {attachments.length}/{MAX_TOTAL_FILES} · 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES})</>)
-                }
-              </span>
-              <span className="text-[10px] mt-1 text-sky-600 font-bold">
-                파일당 최대 {formatFileSize(MAX_FILE_SIZE)} · 총합 최대 {formatFileSize(MAX_TOTAL_SIZE)}
-              </span>
+              {isMobile ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <i className="fas fa-plus-circle text-2xl"></i>
+                    <span>사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES}  문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES}</span>
+                  </div>
+                  <div className="text-[10px] mt-1 text-sky-600 font-bold">
+                    파일당 최대 {formatFileSize(MAX_FILE_SIZE)} · 총합 최대 {formatFileSize(MAX_TOTAL_SIZE)}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-plus-circle text-2xl mb-2"></i>
+                  <span>
+                    클릭하여 파일을 추가하세요 (현재 {attachments.length}/{MAX_TOTAL_FILES} · 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES})
+                  </span>
+                  <span className="text-[10px] mt-1 text-sky-600 font-bold">
+                    파일당 최대 {formatFileSize(MAX_FILE_SIZE)} · 총합 최대 {formatFileSize(MAX_TOTAL_SIZE)}
+                  </span>
+                </>
+              )}
+
             </button>
           ) : (
             <p className="text-center text-xs text-orange-500 font-medium py-2">최대 파일 개수에 도달했습니다.</p>
