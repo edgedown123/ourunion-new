@@ -15,6 +15,18 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   useEffect(() => {
     if (initialPost) {
       setTitle(initialPost.title);
@@ -200,9 +212,11 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
         </div>
 
         <div className="bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-200">
-          <label className="block text-sm font-bold text-gray-700 mb-2">
-            <i className="fas fa-paperclip mr-2"></i> 첨부파일 (사진 최대 5개 / 문서 최대 3개 / 총 8개)
-          </label>
+          {!isMobile && (
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              <i className="fas fa-paperclip mr-2"></i> 첨부파일 (사진 최대 5개 / 문서 최대 3개 / 총 8개)
+            </label>
+          )}
           <input
             type="file"
             ref={fileInputRef}
@@ -240,7 +254,10 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
             >
               <i className="fas fa-plus-circle text-2xl mb-2"></i>
               <span>
-                클릭하여 파일을 추가하세요 (현재 {attachments.length}/{MAX_TOTAL_FILES} · 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES})
+                {isMobile
+                  ? (<>사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES}</>)
+                  : (<>클릭하여 파일을 추가하세요 (현재 {attachments.length}/{MAX_TOTAL_FILES} · 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES})</>)
+                }
               </span>
               <span className="text-[10px] mt-1 text-sky-600 font-bold">
                 파일당 최대 {formatFileSize(MAX_FILE_SIZE)} · 총합 최대 {formatFileSize(MAX_TOTAL_SIZE)}
