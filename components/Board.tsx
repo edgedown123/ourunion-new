@@ -33,6 +33,19 @@ const Board: React.FC<BoardProps> = ({
   type, posts, onWriteClick, onEditClick, selectedPostId, 
   onSelectPost, userRole, onDeletePost, onTogglePin, onSaveComment, onEditComment, onDeleteComment, currentUserName, currentUserId 
 }) => {
+
+  const [isMobile, setIsMobile] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth < 768;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const [postMenuOpen, setPostMenuOpen] = useState(false);
   const [newComment, setNewComment] = useState('');
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
@@ -234,6 +247,10 @@ const Board: React.FC<BoardProps> = ({
   // 상세 보기 모드
   if (selectedPost) {
     const imageAttachments = selectedPost.attachments?.filter(a => a.type.startsWith('image/')) || [];
+    const docAttachments = (selectedPost.attachments || []).filter(a => !a.type.startsWith('image/'));
+    const hasInlineFiles = /\[\[file:\d+\]\]/.test(selectedPost.content || '');
+    const shouldShowAttachmentBox = !isMobile || (docAttachments.length > 0 && !hasInlineFiles);
+
 
     /**
      * 게시물/댓글 본문에 입력된 URL을 자동으로 링크로 변환합니다.
@@ -295,43 +312,109 @@ const renderContentWithInlineImages = (raw?: unknown) => {
         : String(raw);
 
   try {
-    const parts = safeRaw.split(/\[\[img:(\d+)\]\]/g);
-    const used = new Set<number>();
+    const docAttachments = (selectedPost.attachments || []).filter(a => !a.type?.startsWith('image/'));
+
+    const parts = safeRaw.split(/\[\[(img|file):(\d+)\]\]/g);
     const nodes: React.ReactNode[] = [];
 
-    for (let i = 0; i < parts.length; i++) {
-      if (i % 2 === 0) {
-        if (parts[i]) {
-          nodes.push(
-            <span key={`t-${i}`} className="whitespace-pre-wrap break-words">
-              {linkifyText(parts[i])}
-            </span>
-          );
+    for (let i = 0; i < parts.length; ) {
+      const text = parts[i++] ?? '';
+      if (text) {
+        nodes.push(
+          <span key={`t-${i}`} className="whitespace-pre-wrap break-words">
+            {linkifyText(text)}
+          </span>
+        );
+      }
+
+      const kind = parts[i];
+      const idxStr = parts[i + 1];
+
+      if (kind && idxStr != null) {
+        const idx = Number(idxStr);
+
+        if (kind === 'img') {
+          if (!Number.isNaN(idx) && imageAttachments?.[idx]) {
+            nodes.push(
+              <div
+                key={`img-${i}`}
+                className="my-4 w-[calc(100%+2rem)] -mx-4 overflow-hidden rounded-2xl border border-gray-100 bg-white md:w-[calc(100%+3rem)] md:-mx-6"
+                onContextMenu={(e) => {
+                  if (!isMobile) return;
+                  e.preventDefault();
+                  const ok = confirm('이미지를 새 창에서 열까요? (길게 눌러 저장도 가능)');
+                  if (ok) window.open(imageAttachments[idx].data, '_blank');
+                }}
+                onClick={() => {
+                  if (!isMobile) return;
+                  const ok = confirm('이미지를 새 창에서 열까요? (길게 눌러 저장도 가능)');
+                  if (ok) window.open(imageAttachments[idx].data, '_blank');
+                }}
+              >
+                <img
+                  src={imageAttachments[idx].data}
+                  alt={`본문 이미지 ${idx + 1}`}
+                  className="w-full h-auto object-cover"
+                  loading="lazy"
+                />
+              </div>
+            );
+          }
+        } else if (kind === 'file') {
+          if (!Number.isNaN(idx) && docAttachments?.[idx]) {
+            const f = docAttachments[idx];
+            nodes.push(
+              <div
+                key={`file-${i}`}
+                className="my-4 rounded-2xl border bg-white p-4 shadow-sm flex items-center justify-between gap-3"
+                onContextMenu={(e) => {
+                  if (!isMobile) return;
+                  e.preventDefault();
+                  const open = confirm('파일을 열거나 저장할까요? (확인: 열기/다운로드)');
+                  if (open) {
+                    const a = document.createElement('a');
+                    a.href = f.data;
+                    a.download = f.name || 'file';
+                    a.rel = 'noopener';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                  }
+                }}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">📎</div>
+                  <div className="min-w-0">
+                    <div className="font-bold text-sm text-gray-800 truncate">{f.name}</div>
+                    <div className="text-xs text-gray-400">첨부파일</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-xl bg-sky-50 text-sky-700 font-bold text-xs"
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = f.data;
+                    a.download = f.name || 'file';
+                    a.rel = 'noopener';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                  }}
+                >
+                  다운로드
+                </button>
+              </div>
+            );
+          }
         }
+
+        i += 2;
       } else {
-        const idx = Number(parts[i]);
-        if (!Number.isNaN(idx) && imageAttachments?.[idx]) {
-          used.add(idx);
-          nodes.push(
-            <div
-              key={`img-${i}`}
-              // 이미지가 너무 "꽉" 차 보이지 않도록 좌우 여백을 조금 남기기
-              // (기존: 카드 패딩을 "뚫고" 풀-블리드에 가깝게 표시)
-              className="my-4 w-[calc(100%+2rem)] -mx-4 overflow-hidden rounded-2xl border border-gray-100 bg-white md:w-[calc(100%+3rem)] md:-mx-6"
-            >
-              <img
-                src={imageAttachments[idx].data}
-                alt={`본문 이미지 ${idx + 1}`}
-                className="w-full h-auto object-cover"
-                loading="lazy"
-              />
-            </div>
-          );
-        }
+        break;
       }
     }
 
-    // 본문이 완전히 비어있는 경우에도 최소한의 노드를 반환(렌더 크래시 방지)
     if (nodes.length === 0) {
       nodes.push(
         <span key="empty" className="whitespace-pre-wrap break-words text-gray-500">
@@ -340,7 +423,7 @@ const renderContentWithInlineImages = (raw?: unknown) => {
       );
     }
 
-    return { nodes, used };
+    return nodes;
   } catch (e) {
     console.error('[Board] renderContentWithInlineImages failed:', e);
     return {
@@ -437,7 +520,7 @@ const renderContentWithInlineImages = (raw?: unknown) => {
             );
           })()}
 
-          {selectedPost.attachments && selectedPost.attachments.length > 0 && (
+          {shouldShowAttachmentBox && selectedPost.attachments && selectedPost.attachments.length > 0 && (
             // 모바일에서 점선 박스(첨부파일 영역) 내부 패딩을 줄여 카드/파일명이 더 넓게 보이도록
             <div className="mt-20 p-4 md:p-10 bg-gray-50/50 rounded-[2.5rem] border-2 border-dashed border-gray-200">
               <p className="text-xs font-black text-gray-400 mb-6 uppercase tracking-widest flex items-center">
