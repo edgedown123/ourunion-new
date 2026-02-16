@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BoardType, Post, SiteSettings, UserRole, Member, PostAttachment, Comment } from './types';
 import { INITIAL_POSTS, INITIAL_SETTINGS } from './constants';
 import Layout from './components/Layout';
@@ -104,6 +104,11 @@ const App: React.FC = () => {
   const [writingType, setWritingType] = useState<BoardType | null>(null);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+
+  // 상세 페이지 진입(특히 새로고침/딥링크) 시 content/attachments가 비어있으면 단건 로드
+  // - 목록 로드는 트래픽 절감을 위해 최소 필드만 가져오므로, 새로고침하면 (내용 없음)으로 보일 수 있음
+  const detailPrefetchedRef = useRef<Record<string, boolean>>({});
+  const detailPrefetchingRef = useRef<Record<string, boolean>>({});
   
   // 모달 상태 관리
   const [showAdminLogin, setShowAdminLogin] = useState(false);
@@ -1072,6 +1077,45 @@ await cloud.deleteMemberFromCloud(user.id);
       }
     }
   };
+
+  // ✅ 새로고침/딥링크로 바로 상세에 진입하면,
+  // 목록 로드(posts)는 최소 필드만 가져오므로 content가 비어 (내용 없음)으로 보일 수 있음.
+  // selectedPostId가 있을 때 단건 조회로 content/attachments/comments를 채워준다.
+  useEffect(() => {
+    if (!selectedPostId) return;
+    if (isWriting) return;
+    if (!cloud.isSupabaseEnabled()) return;
+
+    const current = posts.find((p) => p.id === selectedPostId);
+    // 목록 fetch는 content를 안 가져오므로, content가 없으면 단건 조회 필요
+    const needsFull = !current || !current.content;
+
+    // 이미 성공적으로 채웠으면 다시 안 함
+    if (!needsFull || detailPrefetchedRef.current[selectedPostId]) return;
+    if (detailPrefetchingRef.current[selectedPostId]) return;
+    detailPrefetchingRef.current[selectedPostId] = true;
+
+    cloud
+      .fetchPostByIdFromCloud(selectedPostId)
+      .then((full) => {
+        if (!full) return;
+        detailPrefetchedRef.current[selectedPostId] = true;
+        setPosts((prev) => {
+          const idx = prev.findIndex((p) => p.id === selectedPostId);
+          if (idx === -1) return [full, ...prev];
+          const next = [...prev];
+          next[idx] = { ...next[idx], ...full } as any;
+          return next;
+        });
+      })
+      .catch(() => {
+        // ignore
+      })
+      .finally(() => {
+        detailPrefetchingRef.current[selectedPostId] = false;
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPostId, isWriting, posts]);
 
   const handleViewPostFromAdmin = (postId: string, type: BoardType) => {
     setActiveTab(type);
