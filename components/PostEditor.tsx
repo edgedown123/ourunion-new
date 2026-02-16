@@ -659,6 +659,17 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             <span className="ml-2 text-gray-400">(본문에서 길게 눌러 이동/삭제)</span>
           </div>
         )}
+
+        {isMobile && (
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click?.()}
+            className="w-full py-3 rounded-xl bg-white border font-bold text-gray-700 flex items-center justify-center gap-2"
+          >
+            <i className="fas fa-paperclip"></i>
+            파일/사진 첨부하기
+          </button>
+        )}
 </div>
 
         <div>
