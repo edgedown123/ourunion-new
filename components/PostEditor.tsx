@@ -18,6 +18,33 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const longPressTimerRef = useRef<number | null>(null);
   const [actionSheet, setActionSheet] = useState<{ kind: 'img' | 'file'; index: number } | null>(null);
 
+  // ✅ 파일카드 '툭' 탭 시: 열기/저장 (밴드 스타일)
+  const [fileTapSheet, setFileTapSheet] = useState<PostAttachment | null>(null);
+
+  const openFile = (f: PostAttachment) => {
+    try {
+      window.open(f.data, '_blank', 'noopener');
+    } catch (e) {
+      console.error('파일 열기 실패:', e);
+      alert('파일을 열 수 없습니다.');
+    }
+  };
+
+  const saveFileToDevice = (f: PostAttachment) => {
+    try {
+      const a = document.createElement('a');
+      a.href = f.data;
+      a.download = f.name || 'file';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.error('파일 저장 실패:', e);
+      alert('파일을 저장할 수 없습니다.');
+    }
+  };
+
   const openActionSheetFromTarget = (target: HTMLElement | null) => {
     if (!target) return;
     const img = target.closest('img[data-img-index]') as HTMLElement | null;
@@ -91,6 +118,21 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     if (!target?.closest('img[data-img-index], [data-file-index]')) return;
     e.preventDefault();
     openActionSheetFromTarget(target);
+  };
+
+  const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // 파일카드만: 탭하면 열기/저장
+    const target = e.target as HTMLElement | null;
+    const file = target?.closest('[data-file-index]') as HTMLElement | null;
+    if (!file) return;
+    const idx = Number(file.getAttribute('data-file-index') || '-1');
+    if (!Number.isFinite(idx) || idx < 0) return;
+    const f = getDocAttachments()[idx];
+    if (!f) return;
+    // contenteditable 내부에서 기본 선택 방지
+    e.preventDefault();
+    e.stopPropagation();
+    setFileTapSheet(f);
   };
 
 
@@ -685,6 +727,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                 onTouchEnd={handleEditorTouchEnd}
                 onTouchCancel={handleEditorTouchEnd}
                 onContextMenu={handleEditorContextMenu}
+                onClick={handleEditorClick}
                 className="w-full min-h-[260px] p-4 border rounded-lg bg-white focus:outline-none"
                 style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}
               />
@@ -726,6 +769,55 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
               >
                 닫기
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ✅ 파일카드 탭: 열기/저장 */}
+        {fileTapSheet && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4"
+            onClick={() => setFileTapSheet(null)}
+          >
+            <div
+              className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-gray-100 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 pt-6 pb-2">
+                <div className="text-lg font-black text-gray-900">파일</div>
+                <div className="mt-1 text-sm text-gray-500 break-all">{fileTapSheet.name}</div>
+              </div>
+              <div className="px-4 pb-4">
+                <button
+                  type="button"
+                  className="w-full py-4 rounded-2xl font-black text-gray-900 hover:bg-gray-50 active:bg-gray-100 transition"
+                  onClick={() => {
+                    const f = fileTapSheet;
+                    setFileTapSheet(null);
+                    openFile(f);
+                  }}
+                >
+                  파일 열기
+                </button>
+                <button
+                  type="button"
+                  className="mt-2 w-full py-4 rounded-2xl font-black text-gray-900 hover:bg-gray-50 active:bg-gray-100 transition"
+                  onClick={() => {
+                    const f = fileTapSheet;
+                    setFileTapSheet(null);
+                    saveFileToDevice(f);
+                  }}
+                >
+                  이 휴대폰에 저장
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full py-4 rounded-2xl font-black text-gray-500 hover:bg-gray-50 active:bg-gray-100 transition"
+                  onClick={() => setFileTapSheet(null)}
+                >
+                  취소
+                </button>
+              </div>
             </div>
           </div>
         )}

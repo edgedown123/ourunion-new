@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Post, BoardType, UserRole, Comment } from '../types';
+import { Post, BoardType, UserRole, Comment, PostAttachment } from '../types';
 import { NAV_ITEMS } from '../constants';
 
 interface BoardProps {
@@ -58,6 +58,34 @@ const Board: React.FC<BoardProps> = ({
 
   const [commentMenuOpenId, setCommentMenuOpenId] = useState<string | null>(null);
   const [editingTarget, setEditingTarget] = useState<{ commentId: string; parentId?: string } | null>(null);
+
+  // ✅ 파일 카드 탭 시 (열기/저장) 밴드 스타일 액션시트
+  const [fileSheet, setFileSheet] = useState<PostAttachment | null>(null);
+
+  const openFile = (f: PostAttachment) => {
+    try {
+      // Android에서는 파일 타입에 따라 "연결 프로그램" chooser가 뜰 수 있음
+      window.open(f.data, '_blank', 'noopener');
+    } catch (e) {
+      console.error('파일 열기 실패:', e);
+      alert('파일을 열 수 없습니다.');
+    }
+  };
+
+  const saveFileToDevice = (f: PostAttachment) => {
+    try {
+      const a = document.createElement('a');
+      a.href = f.data;
+      a.download = f.name || 'file';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.error('파일 저장 실패:', e);
+      alert('파일을 저장할 수 없습니다.');
+    }
+  };
   const [editDraft, setEditDraft] = useState('');
 
   // 게시판 전환 시 페이징 초기화
@@ -368,20 +396,10 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
             nodes.push(
               <div
                 key={`file-${i}`}
-                className="my-4 rounded-2xl border bg-white p-4 shadow-sm flex items-center justify-between gap-3"
-                onContextMenu={(e) => {
-                  if (!isMobile) return;
-                  e.preventDefault();
-                  const open = confirm('파일을 열거나 저장할까요? (확인: 열기/다운로드)');
-                  if (open) {
-                    const a = document.createElement('a');
-                    a.href = f.data;
-                    a.download = f.name || 'file';
-                    a.rel = 'noopener';
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                  }
+                className="my-4 rounded-2xl border bg-white p-4 shadow-sm flex items-center justify-between gap-3 cursor-pointer active:scale-[0.99] transition"
+                onClick={() => {
+                  // ✅ 밴드처럼: 툭 누르면 '열기/저장' 선택
+                  setFileSheet(f);
                 }}
               >
                 <div className="flex items-center gap-3 min-w-0">
@@ -391,21 +409,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                     <div className="text-xs text-gray-400">첨부파일</div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="px-3 py-2 rounded-xl bg-sky-50 text-sky-700 font-bold text-xs"
-                  onClick={() => {
-                    const a = document.createElement('a');
-                    a.href = f.data;
-                    a.download = f.name || 'file';
-                    a.rel = 'noopener';
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                  }}
-                >
-                  다운로드
-                </button>
+                <div className="text-gray-300 font-black">›</div>
               </div>
             );
           }
@@ -890,6 +894,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
   };
 
   return (
+    <>
     <div className="max-w-7xl mx-auto py-10 px-5 animate-fadeIn">
       <div className="flex justify-between items-center mb-12">
         <div>
@@ -956,6 +961,56 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
         </div>
       )}
     </div>
+
+    {/* ✅ 파일 카드 탭 시: 열기/저장 선택 (모바일 밴드 스타일) */}
+    {fileSheet && (
+      <div
+        className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 px-4"
+        onClick={() => setFileSheet(null)}
+      >
+        <div
+          className="w-full max-w-md rounded-3xl bg-white shadow-2xl border border-gray-100 overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-6 pt-6 pb-2">
+            <div className="text-lg font-black text-gray-900">파일</div>
+            <div className="mt-1 text-sm text-gray-500 break-all">{fileSheet.name}</div>
+          </div>
+          <div className="px-4 pb-4">
+            <button
+              type="button"
+              className="w-full py-4 rounded-2xl font-black text-gray-900 hover:bg-gray-50 active:bg-gray-100 transition"
+              onClick={() => {
+                const f = fileSheet;
+                setFileSheet(null);
+                openFile(f);
+              }}
+            >
+              파일 열기
+            </button>
+            <button
+              type="button"
+              className="mt-2 w-full py-4 rounded-2xl font-black text-gray-900 hover:bg-gray-50 active:bg-gray-100 transition"
+              onClick={() => {
+                const f = fileSheet;
+                setFileSheet(null);
+                saveFileToDevice(f);
+              }}
+            >
+              이 휴대폰에 저장
+            </button>
+            <button
+              type="button"
+              className="mt-3 w-full py-4 rounded-2xl font-black text-gray-500 hover:bg-gray-50 active:bg-gray-100 transition"
+              onClick={() => setFileSheet(null)}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 
