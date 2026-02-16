@@ -250,12 +250,12 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           {attachments.length < MAX_TOTAL_FILES ? (
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-6 text-gray-400 text-sm hover:text-sky-primary hover:bg-white transition-all rounded-lg border border-dashed border-gray-300 flex flex-col items-center justify-center"
+              className={`w-full text-gray-400 text-sm hover:text-sky-primary hover:bg-white transition-all rounded-lg border border-dashed border-gray-300 flex items-center justify-center ${isMobile ? "py-4 flex-row gap-2" : "py-6 flex-col"}`}
             >
-              <i className="fas fa-plus-circle text-2xl mb-2"></i>
+              <i className={`fas fa-plus-circle text-2xl ${isMobile ? "" : "mb-2"}`}></i>
               <span>
                 {isMobile
-                  ? (<>사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES}</>)
+                  ? (<>사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES}  문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES}</>)
                   : (<>클릭하여 파일을 추가하세요 (현재 {attachments.length}/{MAX_TOTAL_FILES} · 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES})</>)
                 }
               </span>
