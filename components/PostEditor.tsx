@@ -301,7 +301,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           if (imageIndex >= 0) {
             requestAnimationFrame(() => insertImageIntoEditor(imageIndex));
           }
-          }
           return next;
         });
       };
