@@ -11,15 +11,8 @@ interface PostEditorProps {
 const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCancel }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  // ✅ WYSIWYG: 텍스트/이미지 블록 편집(사용자는 토큰을 보지 않음)
-  type EditorBlock =
-    | { kind: 'text'; id: string; value: string }
-    | { kind: 'img'; id: string; imgIndex: number };
-  const [blocks, setBlocks] = useState<EditorBlock[]>([{ kind: 'text', id: 't0', value: '' }]);
-  const [dragBlockIndex, setDragBlockIndex] = useState<number | null>(null);
+  const editorRef = useRef<HTMLDivElement | null>(null);
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
-  // ✅ 드래그로 이미지 순서 변경(모바일/데스크톱 공통)
-  const [dragImgIndex, setDragImgIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
@@ -39,13 +32,26 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
       setTitle(initialPost.title);
       setContent(initialPost.content);
       setAttachments(initialPost.attachments || []);
-      setBlocks(parseContentToBlocks(initialPost.content));
+      // ✅ 기존 글 수정 시: 내용 토큰을 이미지 미리보기로 변환해서 편집기에 세팅
+      requestAnimationFrame(() => {
+        const el = editorRef.current;
+        if (!el) return;
+        const raw = initialPost.content || '';
+        let safe = raw
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\n/g, '<br/>');
+        safe = safe.replace(/\[\[img:(\d+)\]\]/g, (_m, g1) => {
+          const idx = Number(g1);
+          return `<img data-img-index="${idx}" draggable="true" style="max-width:100%;border-radius:10px;margin:10px 0;display:block;" />`;
+        });
+        el.innerHTML = safe;
+        syncEditorImagesFromAttachments();
+        setContent(serializeEditorToContent());
+      });
     }
   }, [initialPost]);
-
-  useEffect(() => {
-    setContent(blocksToContent(blocks));
-  }, [blocks]);
 
   // ✅ 첨부 제한 (요청사항)
   // - 사진 5개 + 문서 3개 (총 8개)
@@ -58,71 +64,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const MAX_TOTAL_SIZE = 15 * 1024 * 1024; // 15MB
 
   // bytes -> human readable (e.g. 5MB)
-  
-  const newId = () => Math.random().toString(36).slice(2, 9);
-
-  const parseContentToBlocks = (raw: string): EditorBlock[] => {
-    const text = raw ?? '';
-    const reToken = /\[\[img:(\d+)\]\]/g;
-    const result: EditorBlock[] = [];
-    let last = 0;
-    let m: RegExpExecArray | null;
-    while ((m = reToken.exec(text)) !== null) {
-      const start = m.index;
-      const end = reToken.lastIndex;
-      const before = text.slice(last, start);
-      if (before.length > 0) result.push({ kind: 'text', id: newId(), value: before });
-      const num = Number(m[1]);
-      if (Number.isFinite(num)) result.push({ kind: 'img', id: newId(), imgIndex: num });
-      last = end;
-    }
-    const tail = text.slice(last);
-    if (tail.length > 0) result.push({ kind: 'text', id: newId(), value: tail });
-
-    // 최소 1개 텍스트 블록은 유지
-    if (result.length === 0) return [{ kind: 'text', id: 't0', value: '' }];
-    // 연속 텍스트 블록 합치기
-    const merged: EditorBlock[] = [];
-    for (const b of result) {
-      const prev = merged[merged.length - 1];
-      if (b.kind === 'text' && prev?.kind === 'text') {
-        prev.value += b.value;
-      } else {
-        merged.push(b);
-      }
-    }
-    return merged;
-  };
-
-  const blocksToContent = (bs: EditorBlock[]): string => {
-    return bs
-      .map(b => (b.kind === 'text' ? b.value : `[[img:${b.imgIndex}]]`))
-      .join('');
-  };
-
-  const insertTextBlockAfter = (afterIndex: number) => {
-    setBlocks(prev => {
-      const next = [...prev];
-      next.splice(afterIndex + 1, 0, { kind: 'text', id: newId(), value: '\n' });
-      return next;
-    });
-  };
-
-  const updateTextBlock = (id: string, value: string) => {
-    setBlocks(prev => prev.map(b => (b.kind === 'text' && b.id === id ? { ...b, value } : b)));
-  };
-
-  const reorderBlocks = (from: number, to: number) => {
-    setBlocks(prev => {
-      if (from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  };
-
-const formatFileSize = (bytes: number) => {
+  const formatFileSize = (bytes: number) => {
     if (!Number.isFinite(bytes) || bytes <= 0) return '0B';
     const units = ['B', 'KB', 'MB', 'GB'];
     let size = bytes;
@@ -172,6 +114,137 @@ const formatFileSize = (bytes: number) => {
     return attachments.reduce((sum, a) => sum + dataUrlToBytes(a.data), 0);
   };
 
+  const isImageAttachment = (a: PostAttachment) => !!a.type?.startsWith('image/');
+  const getImageAttachments = () => attachments.filter(isImageAttachment);
+
+  const serializeEditorToContent = (): string => {
+    const el = editorRef.current;
+    if (!el) return '';
+    let h = el.innerHTML || '';
+    h = h.replace(/<img[^>]*data-img-index="(\d+)"[^>]*>/gi, '[[img:$1]]');
+    h = h.replace(/<br\s*\/?>/gi, '\n');
+    h = h.replace(/<\/div>\s*<div>/gi, '\n');
+    h = h.replace(/<\/p>\s*<p>/gi, '\n');
+    h = h.replace(/<[^>]+>/g, '');
+    h = h.replace(/&nbsp;/g, ' ')
+         .replace(/&amp;/g, '&')
+         .replace(/&lt;/g, '<')
+         .replace(/&gt;/g, '>')
+         .replace(/&quot;/g, '"')
+         .replace(/&#39;/g, "'"); 
+    h = h.replace(/\n{3,}/g, '\n\n').trim();
+    return h;
+  };
+
+  const syncEditorImagesFromAttachments = () => {
+    const el = editorRef.current;
+    if (!el) return;
+    const imgs = Array.from(el.querySelectorAll('img[data-img-index]')) as HTMLImageElement[];
+    const imageAtts = getImageAttachments();
+    for (const node of imgs) {
+      const idx = Number(node.getAttribute('data-img-index') || '-1');
+      if (!Number.isFinite(idx) || idx < 0) continue;
+      const data = imageAtts[idx]?.data;
+      if (data) node.src = data;
+    }
+  };
+
+  const removeImageByImgIndex = (imgIndex: number) => {
+    setAttachments(prev => {
+      const images = prev.filter(isImageAttachment);
+      const nonImages = prev.filter(a => !isImageAttachment(a));
+      if (imgIndex < 0 || imgIndex >= images.length) return prev;
+      const nextImages = images.filter((_, i) => i !== imgIndex);
+      return [...nextImages, ...nonImages];
+    });
+
+    requestAnimationFrame(() => {
+      const el = editorRef.current;
+      if (!el) return;
+      const nodes = Array.from(el.querySelectorAll('img[data-img-index]')) as HTMLImageElement[];
+      for (const n of nodes) {
+        const idx = Number(n.getAttribute('data-img-index') || '-1');
+        if (idx === imgIndex) n.remove();
+        else if (idx > imgIndex) n.setAttribute('data-img-index', String(idx - 1));
+      }
+      syncEditorImagesFromAttachments();
+      setContent(serializeEditorToContent());
+    });
+  };
+
+  const insertImageIntoEditor = (imgIndex: number) => {
+    const el = editorRef.current;
+    if (!el) return;
+    const imgData = getImageAttachments()[imgIndex]?.data;
+    if (!imgData) return;
+
+    const img = document.createElement('img');
+    img.src = imgData;
+    img.setAttribute('data-img-index', String(imgIndex));
+    img.setAttribute('draggable', 'true');
+    img.style.maxWidth = '100%';
+    img.style.borderRadius = '10px';
+    img.style.margin = '10px 0';
+    img.style.display = 'block';
+
+    img.addEventListener('dragstart', (e) => {
+      (e.dataTransfer as DataTransfer).setData('text/plain', String(imgIndex));
+      (e.dataTransfer as DataTransfer).effectAllowed = 'move';
+      img.classList.add('opacity-60');
+    });
+    img.addEventListener('dragend', () => img.classList.remove('opacity-60'));
+
+    img.addEventListener('click', () => {
+      if (confirm('이 이미지를 삭제할까요?')) {
+        removeImageByImgIndex(imgIndex);
+      }
+    });
+
+    const sel = window.getSelection?.();
+    if (sel && sel.rangeCount > 0) {
+      const range = sel.getRangeAt(0);
+      if (!el.contains(range.startContainer)) {
+        el.appendChild(img);
+        el.appendChild(document.createElement('br'));
+      } else {
+        range.deleteContents();
+        range.insertNode(img);
+        range.collapse(false);
+        range.insertNode(document.createElement('br'));
+        range.collapse(false);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    } else {
+      el.appendChild(img);
+      el.appendChild(document.createElement('br'));
+    }
+    setContent(serializeEditorToContent());
+  };
+
+  const handleEditorDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const el = editorRef.current;
+    if (!el) return;
+    const fromIndex = Number(e.dataTransfer.getData('text/plain'));
+    if (!Number.isFinite(fromIndex) || fromIndex < 0) return;
+
+    // 가장 가까운 img를 찾고 그 앞에 삽입
+    const target = (e.target as HTMLElement).closest('img[data-img-index]') as HTMLImageElement | null;
+    const dragged = el.querySelector(`img[data-img-index="${fromIndex}"]`) as HTMLImageElement | null;
+    if (!dragged) return;
+
+    if (target && target !== dragged) {
+      target.parentNode?.insertBefore(dragged, target);
+      // 줄바꿈이 자연스럽게 유지되도록 br 하나 추가
+      if (dragged.nextSibling && (dragged.nextSibling as any).tagName !== 'BR') {
+        dragged.parentNode?.insertBefore(document.createElement('br'), dragged.nextSibling);
+      }
+    }
+    setContent(serializeEditorToContent());
+  };
+
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -219,9 +292,17 @@ const formatFileSize = (bytes: number) => {
           fileData = await compressImage(fileData);
         }
         setAttachments(prev => {
-          // ✅ 이미지도 본문에 토큰([[img:n]])을 삽입하지 않고,
-          //    첨부 목록(미리보기) + 게시물 표시 화면에서 자동 렌더링되도록 처리
-          return [...prev, { name: file.name, data: fileData, type: file.type }];
+          const imageIndex = file.type?.startsWith('image/')
+            ? prev.filter(p => p.type?.startsWith('image/')).length
+            : -1;
+          const next = [...prev, { name: file.name, data: fileData, type: file.type }];
+
+                    // ✅ 본문 편집기 커서 위치에 이미지 미리보기 삽입
+          if (imageIndex >= 0) {
+            requestAnimationFrame(() => insertImageIntoEditor(imageIndex));
+          }
+          }
+          return next;
         });
       };
       reader.readAsDataURL(file);
@@ -235,77 +316,6 @@ const formatFileSize = (bytes: number) => {
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
-    // 이미지 삭제 시 블록의 imgIndex도 정리(앞당김)
-    setBlocks(prev => {
-      const imagesBefore = attachments
-        .filter(a => a.type?.startsWith('image/'))
-        .map((_, i) => i); // [0..n-1]
-      // index가 이미지인지 판단
-      const isImg = attachments[index]?.type?.startsWith('image/');
-      if (!isImg) return prev;
-
-      // 삭제될 이미지의 "이미지 인덱스" 계산: attachments 중 이미지들 기준
-      let removedImgIndex = -1;
-      let counter = 0;
-      for (let i = 0; i < attachments.length; i++) {
-        if (attachments[i]?.type?.startsWith('image/')) {
-          if (i === index) { removedImgIndex = counter; break; }
-          counter += 1;
-        }
-      }
-      if (removedImgIndex < 0) return prev;
-
-      return prev
-        .filter(b => !(b.kind === 'img' && b.imgIndex === removedImgIndex))
-        .map(b => (b.kind === 'img' && b.imgIndex > removedImgIndex ? { ...b, imgIndex: b.imgIndex - 1 } : b));
-    });
-  };
-
-  const isImageAttachment = (a: PostAttachment) => !!a.type?.startsWith('image/');
-
-  // attachments 안에서 "이미지들만" 순서를 바꾸고, 문서(비이미지)는 그대로 뒤에 유지
-  const reorderImagesInAttachments = (from: number, to: number) => {
-    setAttachments(prev => {
-      const images = prev.filter(isImageAttachment);
-      const nonImages = prev.filter(a => !isImageAttachment(a));
-      if (from < 0 || to < 0 || from >= images.length || to >= images.length) return prev;
-
-      const nextImages = [...images];
-      const [moved] = nextImages.splice(from, 1);
-      nextImages.splice(to, 0, moved);
-
-      return [...nextImages, ...nonImages];
-    });
-  };
-
-  const getImageAttachments = () => attachments.filter(isImageAttachment);
-
-  const removeImageByImgIndex = (imgIndex: number) => {
-    // imgIndex는 "이미지들만" 기준 인덱스
-    setAttachments(prev => {
-      const images = prev.filter(isImageAttachment);
-      const nonImages = prev.filter(a => !isImageAttachment(a));
-      const target = images[imgIndex];
-      if (!target) return prev;
-      const nextImages = images.filter((_, i) => i !== imgIndex);
-      return [...nextImages, ...nonImages];
-    });
-
-    setBlocks(prev => {
-      const next: EditorBlock[] = [];
-      for (const b of prev) {
-        if (b.kind === 'img') {
-          if (b.imgIndex === imgIndex) continue; // 해당 이미지 블록 제거
-          if (b.imgIndex > imgIndex) next.push({ ...b, imgIndex: b.imgIndex - 1 }); // 뒤 인덱스 당김
-          else next.push(b);
-        } else {
-          next.push(b);
-        }
-      }
-      // 최소 1개 텍스트 블록 유지
-      if (next.length === 0) return [{ kind: 'text', id: 't0', value: '' }];
-      return next;
-    });
   };
 
   return (
@@ -391,76 +401,24 @@ const formatFileSize = (bytes: number) => {
           )}
         </div>
 
-        
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
-
-          <div className="border rounded-lg p-3 bg-white">
-            {blocks.map((b, idx) => (
-              <div
-                key={b.id}
-                className="mb-3 last:mb-0 border rounded-md p-2 bg-gray-50"
-                draggable
-                onDragStart={() => setDragBlockIndex(idx)}
+          <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={() => setContent(serializeEditorToContent())}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (dragBlockIndex === null) return;
-                  reorderBlocks(dragBlockIndex, idx);
-                  setDragBlockIndex(null);
-                }}
-                onDragEnd={() => setDragBlockIndex(null)}
-                style={{ touchAction: 'none' }}
-                title="드래그해서 위치를 바꿀 수 있어요"
-              >
-                {b.kind === 'text' ? (
-                  <textarea
-                    className="w-full min-h-[90px] p-2 border rounded bg-white"
-                    value={b.value}
-                    onChange={(e) => updateTextBlock(b.id, e.target.value)}
-                    placeholder="내용을 입력하세요"
-                  />
-                ) : (
-                  <div className="relative">
-                    <img
-                      src={getImageAttachments()[b.imgIndex]?.data || ''}
-                      alt={getImageAttachments()[b.imgIndex]?.name || `img-${b.imgIndex}`}
-                      className="w-full max-h-64 object-contain rounded bg-white border"
-                      loading="lazy"
-                    />
-                    <button
-                      type="button"
-                      className="absolute top-2 right-2 bg-white/90 rounded-full w-8 h-8 flex items-center justify-center text-red-500 border"
-                      onClick={() => removeImageByImgIndex(b.imgIndex)}
-                      aria-label="이미지 삭제"
-                      title="이미지 삭제"
-                    >
-                      ✕
-                    </button>
-                    <div className="absolute bottom-2 left-2 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
-                      이미지 {b.imgIndex + 1}
-                    </div>
-                  </div>
-                )}
-
-                {/* 텍스트 추가 버튼 (블록 사이에 문단 추가 가능) */}
-                <div className="flex gap-2 mt-2 items-center">
-                  <button
-                    type="button"
-                    className="text-xs px-3 py-1 rounded border bg-gray-50"
-                    onClick={() => insertTextBlockAfter(idx)}
-                  >
-                    + 텍스트 추가
-                  </button>
-                  <div className="text-xs text-gray-400">블록을 드래그하면 위치가 바뀝니다</div>
-                </div>
-              </div>
-            ))}
-          </div>
+                onDrop={handleEditorDrop}
+                className="w-full min-h-[260px] p-4 border rounded-lg bg-white focus:outline-none"
+                style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}
+              />
         </div>
+
         <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
-            onClick={() => onSave(title, blocksToContent(blocks), attachments, initialPost?.id)}
+            onClick={() => onSave(title, content, attachments, initialPost?.id)}
             disabled={!title || !content}
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
