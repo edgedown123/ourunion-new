@@ -11,7 +11,12 @@ interface PostEditorProps {
 const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCancel }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const contentRef = useRef<HTMLTextAreaElement | null>(null);
+  // ✅ WYSIWYG: 텍스트/이미지 블록 편집(사용자는 토큰을 보지 않음)
+  type EditorBlock =
+    | { kind: 'text'; id: string; value: string }
+    | { kind: 'img'; id: string; imgIndex: number };
+  const [blocks, setBlocks] = useState<EditorBlock[]>([{ kind: 'text', id: 't0', value: '' }]);
+  const [dragBlockIndex, setDragBlockIndex] = useState<number | null>(null);
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   // ✅ 드래그로 이미지 순서 변경(모바일/데스크톱 공통)
   const [dragImgIndex, setDragImgIndex] = useState<number | null>(null);
@@ -34,8 +39,13 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
       setTitle(initialPost.title);
       setContent(initialPost.content);
       setAttachments(initialPost.attachments || []);
+      setBlocks(parseContentToBlocks(initialPost.content));
     }
   }, [initialPost]);
+
+  useEffect(() => {
+    setContent(blocksToContent(blocks));
+  }, [blocks]);
 
   // ✅ 첨부 제한 (요청사항)
   // - 사진 5개 + 문서 3개 (총 8개)
@@ -48,7 +58,71 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const MAX_TOTAL_SIZE = 15 * 1024 * 1024; // 15MB
 
   // bytes -> human readable (e.g. 5MB)
-  const formatFileSize = (bytes: number) => {
+  
+  const newId = () => Math.random().toString(36).slice(2, 9);
+
+  const parseContentToBlocks = (raw: string): EditorBlock[] => {
+    const text = raw ?? '';
+    const reToken = /\[\[img:(\d+)\]\]/g;
+    const result: EditorBlock[] = [];
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = reToken.exec(text)) !== null) {
+      const start = m.index;
+      const end = reToken.lastIndex;
+      const before = text.slice(last, start);
+      if (before.length > 0) result.push({ kind: 'text', id: newId(), value: before });
+      const num = Number(m[1]);
+      if (Number.isFinite(num)) result.push({ kind: 'img', id: newId(), imgIndex: num });
+      last = end;
+    }
+    const tail = text.slice(last);
+    if (tail.length > 0) result.push({ kind: 'text', id: newId(), value: tail });
+
+    // 최소 1개 텍스트 블록은 유지
+    if (result.length === 0) return [{ kind: 'text', id: 't0', value: '' }];
+    // 연속 텍스트 블록 합치기
+    const merged: EditorBlock[] = [];
+    for (const b of result) {
+      const prev = merged[merged.length - 1];
+      if (b.kind === 'text' && prev?.kind === 'text') {
+        prev.value += b.value;
+      } else {
+        merged.push(b);
+      }
+    }
+    return merged;
+  };
+
+  const blocksToContent = (bs: EditorBlock[]): string => {
+    return bs
+      .map(b => (b.kind === 'text' ? b.value : `[[img:${b.imgIndex}]]`))
+      .join('');
+  };
+
+  const insertTextBlockAfter = (afterIndex: number) => {
+    setBlocks(prev => {
+      const next = [...prev];
+      next.splice(afterIndex + 1, 0, { kind: 'text', id: newId(), value: '\n' });
+      return next;
+    });
+  };
+
+  const updateTextBlock = (id: string, value: string) => {
+    setBlocks(prev => prev.map(b => (b.kind === 'text' && b.id === id ? { ...b, value } : b)));
+  };
+
+  const reorderBlocks = (from: number, to: number) => {
+    setBlocks(prev => {
+      if (from < 0 || to < 0 || from >= prev.length || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+const formatFileSize = (bytes: number) => {
     if (!Number.isFinite(bytes) || bytes <= 0) return '0B';
     const units = ['B', 'KB', 'MB', 'GB'];
     let size = bytes;
@@ -161,6 +235,30 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
+    // 이미지 삭제 시 블록의 imgIndex도 정리(앞당김)
+    setBlocks(prev => {
+      const imagesBefore = attachments
+        .filter(a => a.type?.startsWith('image/'))
+        .map((_, i) => i); // [0..n-1]
+      // index가 이미지인지 판단
+      const isImg = attachments[index]?.type?.startsWith('image/');
+      if (!isImg) return prev;
+
+      // 삭제될 이미지의 "이미지 인덱스" 계산: attachments 중 이미지들 기준
+      let removedImgIndex = -1;
+      let counter = 0;
+      for (let i = 0; i < attachments.length; i++) {
+        if (attachments[i]?.type?.startsWith('image/')) {
+          if (i === index) { removedImgIndex = counter; break; }
+          counter += 1;
+        }
+      }
+      if (removedImgIndex < 0) return prev;
+
+      return prev
+        .filter(b => !(b.kind === 'img' && b.imgIndex === removedImgIndex))
+        .map(b => (b.kind === 'img' && b.imgIndex > removedImgIndex ? { ...b, imgIndex: b.imgIndex - 1 } : b));
+    });
   };
 
   const isImageAttachment = (a: PostAttachment) => !!a.type?.startsWith('image/');
@@ -267,23 +365,70 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
-          <textarea
-            ref={contentRef}
-            className="w-full border-gray-300 rounded-lg p-3 h-64 border focus:ring-sky-500 outline-none resize-none leading-relaxed"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-          ></textarea>
-            {/* ✅ 작성 중 첨부 이미지 미리보기 (직관성 강화) */}
-            {getImageAttachments().length > 0 && (
-              <div className="mt-4">
-                <div className="text-sm text-gray-600 mb-2">첨부 이미지 (드래그로 순서 변경)</div>
-                <div className="grid grid-cols-3 gap-2">
-                  {getImageAttachments().map((img, idx) => (
-                    <div
-                      key={`${img.name}-${idx}`}
-                      className="relative rounded-lg overflow-hidden border bg-white"
-                      draggable
-                      onDragStart={() => setDragImgIndex(idx)}
+          
+            <div className="border rounded-lg p-3 bg-white">
+              {blocks.map((b, idx) => (
+                <div
+                  key={b.id}
+                  className="mb-3 last:mb-0"
+                  draggable
+                  onDragStart={() => setDragBlockIndex(idx)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => {
+                    if (dragBlockIndex === null) return;
+                    reorderBlocks(dragBlockIndex, idx);
+                    setDragBlockIndex(null);
+                  }}
+                  onDragEnd={() => setDragBlockIndex(null)}
+                  style={{ touchAction: 'none' }}
+                >
+                  {b.kind === 'text' ? (
+                    <textarea
+                      className="w-full min-h-[90px] p-2 border rounded-md"
+                      placeholder="내용을 입력하세요"
+                      value={b.value}
+                      onChange={(e) => updateTextBlock(b.id, e.target.value)}
+                    />
+                  ) : (
+                    <div className="relative rounded-lg overflow-hidden border bg-gray-50">
+                      <img src={attachments.filter(a => a.type?.startsWith('image/'))[b.imgIndex]?.data || ''} alt={`img-${b.imgIndex}`} className="w-full h-48 object-cover" />
+                      <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
+                        이미지 {b.imgIndex + 1} (드래그로 위치 이동)
+                      </div>
+                      <button
+                        type="button"
+                        className="absolute top-2 right-2 bg-white/90 rounded-full w-9 h-9 flex items-center justify-center text-red-500 border"
+                        onClick={() => {
+                          // 이미지 블록 삭제 + 해당 첨부 이미지 삭제(인덱스 재정렬 포함)
+                          const imgs = attachments
+                            .map((a, i) => ({ a, i }))
+                            .filter(x => x.a.type?.startsWith('image/'));
+                          const target = imgs[b.imgIndex];
+                          if (target) removeAttachment(target.i);
+                        }}
+                        aria-label="이미지 삭제"
+                        title="삭제"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 텍스트 추가 버튼 (블록 사이에 문단 추가 가능) */}
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      type="button"
+                      className="text-xs px-3 py-1 rounded border bg-gray-50"
+                      onClick={() => insertTextBlockAfter(idx)}
+                    >
+                      + 텍스트 추가
+                    </button>
+                    <div className="text-xs text-gray-400 self-center">블록을 드래그하면 위치가 바뀝니다</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => {
                         if (dragImgIndex === null) return;
@@ -329,7 +474,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
         <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
-            onClick={() => onSave(title, content, attachments, initialPost?.id)}
+            onClick={() => onSave(title, blocksToContent(blocks), attachments, initialPost?.id)}
             disabled={!title || !content}
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
