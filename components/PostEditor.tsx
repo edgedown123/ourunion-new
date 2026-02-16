@@ -13,6 +13,8 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [content, setContent] = useState('');
   const contentRef = useRef<HTMLTextAreaElement | null>(null);
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
+  // ✅ 드래그로 이미지 순서 변경(모바일/데스크톱 공통)
+  const [dragImgIndex, setDragImgIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
@@ -161,6 +163,25 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  const isImageAttachment = (a: PostAttachment) => !!a.type?.startsWith('image/');
+
+  // attachments 안에서 "이미지들만" 순서를 바꾸고, 문서(비이미지)는 그대로 뒤에 유지
+  const reorderImagesInAttachments = (from: number, to: number) => {
+    setAttachments(prev => {
+      const images = prev.filter(isImageAttachment);
+      const nonImages = prev.filter(a => !isImageAttachment(a));
+      if (from < 0 || to < 0 || from >= images.length || to >= images.length) return prev;
+
+      const nextImages = [...images];
+      const [moved] = nextImages.splice(from, 1);
+      nextImages.splice(to, 0, moved);
+
+      return [...nextImages, ...nonImages];
+    });
+  };
+
+  const getImageAttachments = () => attachments.filter(isImageAttachment);
+
   return (
     <div className="max-w-4xl mx-auto py-8 px-4"> 
 
@@ -252,6 +273,57 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
             value={content}
             onChange={(e) => setContent(e.target.value)}
           ></textarea>
+            {/* ✅ 작성 중 첨부 이미지 미리보기 (직관성 강화) */}
+            {getImageAttachments().length > 0 && (
+              <div className="mt-4">
+                <div className="text-sm text-gray-600 mb-2">첨부 이미지 (드래그로 순서 변경)</div>
+                <div className="grid grid-cols-3 gap-2">
+                  {getImageAttachments().map((img, idx) => (
+                    <div
+                      key={`${img.name}-${idx}`}
+                      className="relative rounded-lg overflow-hidden border bg-white"
+                      draggable
+                      onDragStart={() => setDragImgIndex(idx)}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => {
+                        if (dragImgIndex === null) return;
+                        reorderImagesInAttachments(dragImgIndex, idx);
+                        setDragImgIndex(null);
+                      }}
+                      onDragEnd={() => setDragImgIndex(null)}
+                      style={{ touchAction: 'none' }}
+                      title="드래그해서 순서를 바꿀 수 있어요"
+                    >
+                      <img
+                        src={img.data}
+                        alt={img.name}
+                        className="w-full h-24 object-cover"
+                        loading="lazy"
+                      />
+                      <button
+                        type="button"
+                        className="absolute top-1 right-1 bg-white/90 rounded-full w-7 h-7 flex items-center justify-center text-red-500 border"
+                        onClick={() => {
+                          // 원본 attachments에서 해당 이미지의 실제 index 찾아 삭제
+                          const globalIndex = attachments.findIndex(a => a === img);
+                          if (globalIndex >= 0) removeAttachment(globalIndex);
+                        }}
+                        aria-label="이미지 삭제"
+                      >
+                        ✕
+                      </button>
+                      <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
+                        {idx + 1}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-500 mt-2">
+                  * 이미지는 게시물에 자동으로 함께 표시됩니다.
+                </div>
+              </div>
+            )}
+
         </div>
 
         <div className="flex justify-end space-x-3 pt-4">
