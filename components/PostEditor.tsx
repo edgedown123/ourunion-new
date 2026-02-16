@@ -143,16 +143,9 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           fileData = await compressImage(fileData);
         }
         setAttachments(prev => {
-          const imageIndex = file.type?.startsWith('image/')
-            ? prev.filter(p => p.type?.startsWith('image/')).length
-            : -1;
-          const next = [...prev, { name: file.name, data: fileData, type: file.type }];
-
-          // 글쓰기 textarea가 마운트된 경우에만 커서 위치에 토큰 삽입
-          if (imageIndex >= 0 && contentRef.current) {
-            insertImageTokenAtCursor(`[[img:${imageIndex}]]`);
-          }
-          return next;
+          // ✅ 이미지도 본문에 토큰([[img:n]])을 삽입하지 않고,
+          //    첨부 목록(미리보기) + 게시물 표시 화면에서 자동 렌더링되도록 처리
+          return [...prev, { name: file.name, data: fileData, type: file.type }];
         });
       };
       reader.readAsDataURL(file);
@@ -166,35 +159,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
-  };
-
-
-  const insertImageTokenAtCursor = (token: string) => {
-    const ta = contentRef.current;
-    setContent(prev => {
-      // textarea가 아직 없으면 맨 아래에 추가
-      if (!ta) return prev ? `${prev}\n${token}\n` : `${token}\n`;
-
-      const start = ta.selectionStart ?? prev.length;
-      const end = ta.selectionEnd ?? prev.length;
-
-      const prefix = prev.slice(0, start);
-      const suffix = prev.slice(end);
-
-      const before = prefix && !prefix.endsWith('\n') ? prefix + '\n' : prefix;
-      const after = suffix && !suffix.startsWith('\n') ? '\n' + suffix : suffix;
-      const next = `${before}${token}${after}`;
-
-      requestAnimationFrame(() => {
-        try {
-          const pos = before.length + token.length + (after.startsWith('\n') ? 1 : 0);
-          ta.focus();
-          ta.setSelectionRange(pos, pos);
-        } catch {}
-      });
-
-      return next;
-    });
   };
 
   return (
