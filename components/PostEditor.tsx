@@ -373,46 +373,7 @@ const formatFileSize = (bytes: number) => {
                   className="mb-3 last:mb-0"
                   draggable
                   onDragStart={() => setDragBlockIndex(idx)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => {
-                    if (dragBlockIndex === null) return;
-                    reorderBlocks(dragBlockIndex, idx);
-                    setDragBlockIndex(null);
-                  }}
-                  onDragEnd={() => setDragBlockIndex(null)}
-                  style={{ touchAction: 'none' }}
-                >
-                  {b.kind === 'text' ? (
-                    <textarea
-                      className="w-full min-h-[90px] p-2 border rounded-md"
-                      placeholder="내용을 입력하세요"
-                      value={b.value}
-                      onChange={(e) => updateTextBlock(b.id, e.target.value)}
-                    />
-                  ) : (
-                    <div className="relative rounded-lg overflow-hidden border bg-gray-50">
-                      <img src={attachments.filter(a => a.type?.startsWith('image/'))[b.imgIndex]?.data || ''} alt={`img-${b.imgIndex}`} className="w-full h-48 object-cover" />
-                      <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded">
-                        이미지 {b.imgIndex + 1} (드래그로 위치 이동)
-                      </div>
-                      <button
-                        type="button"
-                        className="absolute top-2 right-2 bg-white/90 rounded-full w-9 h-9 flex items-center justify-center text-red-500 border"
-                        onClick={() => {
-                          // 이미지 블록 삭제 + 해당 첨부 이미지 삭제(인덱스 재정렬 포함)
-                          const imgs = attachments
-                            .map((a, i) => ({ a, i }))
-                            .filter(x => x.a.type?.startsWith('image/'));
-                          const target = imgs[b.imgIndex];
-                          if (target) removeAttachment(target.i);
-                        }}
-                        aria-label="이미지 삭제"
-                        title="삭제"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
+                  
 
                   {/* 텍스트 추가 버튼 (블록 사이에 문단 추가 가능) */}
                   <div className="flex gap-2 mt-2">
@@ -428,46 +389,6 @@ const formatFileSize = (bytes: number) => {
                 </div>
               ))}
             </div>
-
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={() => {
-                        if (dragImgIndex === null) return;
-                        reorderImagesInAttachments(dragImgIndex, idx);
-                        setDragImgIndex(null);
-                      }}
-                      onDragEnd={() => setDragImgIndex(null)}
-                      style={{ touchAction: 'none' }}
-                      title="드래그해서 순서를 바꿀 수 있어요"
-                    >
-                      <img
-                        src={img.data}
-                        alt={img.name}
-                        className="w-full h-24 object-cover"
-                        loading="lazy"
-                      />
-                      <button
-                        type="button"
-                        className="absolute top-1 right-1 bg-white/90 rounded-full w-7 h-7 flex items-center justify-center text-red-500 border"
-                        onClick={() => {
-                          // 원본 attachments에서 해당 이미지의 실제 index 찾아 삭제
-                          const globalIndex = attachments.findIndex(a => a === img);
-                          if (globalIndex >= 0) removeAttachment(globalIndex);
-                        }}
-                        aria-label="이미지 삭제"
-                      >
-                        ✕
-                      </button>
-                      <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-2 py-0.5 rounded">
-                        {idx + 1}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div className="text-xs text-gray-500 mt-2">
-                  * 이미지는 게시물에 자동으로 함께 표시됩니다.
-                </div>
-              </div>
-            )}
 
         </div>
 
