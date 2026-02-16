@@ -334,6 +334,31 @@ const App: React.FC = () => {
       // ignore
     }
   };
+
+  // ✅ 목록용 fetchPostsFromCloud()는 트래픽 절감을 위해 content/attachments/comments를 비우는 경우가 있음.
+  // 포커스 전환/화면 재개 시 syncData()가 목록을 다시 받으면서,
+  // 이미 상세에서 로드해 둔 content가 덮어써져 (내용 없음)으로 보이는 문제가 생길 수 있다.
+  // -> 새 목록을 적용할 때, 이전 state에 상세 필드가 있으면 보존한다.
+  const mergePostsPreserveDetail = useCallback((prev: Post[], fresh: Post[]) => {
+    if (!Array.isArray(fresh)) return prev;
+    const prevMap = new Map(prev.map((p) => [p.id, p]));
+    return fresh.map((f) => {
+      const p = prevMap.get(f.id);
+      if (!p) return f;
+      const keepContent = (!f.content || f.content.trim() === '') && (p.content && p.content.trim() !== '');
+      const keepAttachments = (!f.attachments || f.attachments.length === 0) && (p.attachments && p.attachments.length > 0);
+      const keepComments = (!f.comments || f.comments.length === 0) && (p.comments && p.comments.length > 0);
+      if (!keepContent && !keepAttachments && !keepComments) return { ...p, ...f };
+      return {
+        ...p,
+        ...f,
+        content: keepContent ? p.content : f.content,
+        attachments: keepAttachments ? p.attachments : f.attachments,
+        comments: keepComments ? p.comments : f.comments,
+      } as Post;
+    });
+  }, []);
+
   const syncData = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
     else setIsRefreshing(true);
@@ -352,7 +377,7 @@ const App: React.FC = () => {
             cloud.fetchSettingsFromCloud(),
           ]);
 
-          if (pData) setPosts(pData);
+          if (pData) setPosts((prev) => mergePostsPreserveDetail(prev, pData));
           if (mData) {
             setMembers(mData);
             localStorage.setItem('union_members', JSON.stringify(mData));
@@ -364,7 +389,7 @@ const App: React.FC = () => {
             cloud.fetchPostsFromCloud(),
             cloud.fetchMembersFromCloud(),
           ]);
-          if (pData) setPosts(pData);
+          if (pData) setPosts((prev) => mergePostsPreserveDetail(prev, pData));
           if (mData) {
             setMembers(mData);
             localStorage.setItem('union_members', JSON.stringify(mData));
