@@ -311,18 +311,33 @@ const Board: React.FC<BoardProps> = ({
     setFileActionSheet({ name: (f.name || "파일").toString(), data: f.data });
   };
 
-  const doOpenFile = (f: { name?: string; data: string }) => {
+  const doOpenFile = async (f: { name?: string; data: string }) => {
     try {
-      const a = document.createElement("a");
-      a.href = f.data;
-      a.target = "_blank";
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      // 모바일은 data: URL 그대로 여는 게 앱 선택(뷰어 선택) UX가 더 잘 먹힘
+      if (isMobile) {
+        const a = document.createElement('a');
+        a.href = f.data;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return;
+      }
+
+      // 데스크톱: data: URL을 새탭으로 열면 빈 화면이 뜨는 경우가 있어
+      // blob URL로 변환해서 여는 방식으로 안정화
+      setFileActionBusy(true);
+      const res = await fetch(f.data);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
-      console.error("파일 열기 실패:", e);
-      alert("파일을 열 수 없습니다.");
+      console.error('파일 열기 실패:', e);
+      alert('파일을 열 수 없습니다.');
+    } finally {
+      setFileActionBusy(false);
     }
   };
 
@@ -858,10 +873,10 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
           }}
         >
           <div
-            className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl"
+            className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-t">
+            <div className="divide-y">
               <button
                 type="button"
                 className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50"
@@ -875,7 +890,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
               </button>
               <button
                 type="button"
-                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50 border-t"
+                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50"
                 disabled={fileActionBusy}
                 onClick={async () => {
                   await doSaveFile(fileActionSheet);
@@ -1063,10 +1078,10 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
           }}
         >
           <div
-            className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl"
+            className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="border-t">
+            <div className="divide-y">
               <button
                 type="button"
                 className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50"
@@ -1080,7 +1095,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
               </button>
               <button
                 type="button"
-                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50 border-t"
+                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50"
                 disabled={fileActionBusy}
                 onClick={async () => {
                   await doSaveFile(fileActionSheet);
