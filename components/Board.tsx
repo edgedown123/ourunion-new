@@ -483,6 +483,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
     const isNoticeCategory = selectedPost.type === 'notice_all' || selectedPost.type === 'family_events';
 
     return (
+      <>
       <div className="max-w-4xl mx-auto py-8 px-2 sm:px-5 animate-fadeIn">
         <div className="flex justify-between items-center mb-8">
           <button onClick={() => onSelectPost(null)} className="flex items-center text-gray-500 hover:text-sky-primary group font-bold">
@@ -847,6 +848,52 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
           )}
         </section>
       </div>
+
+      {/* 모바일: 파일카드 액션시트(상세 화면에서도 동작해야 함) */}
+      {isMobile && fileActionSheet && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
+          onClick={() => {
+            if (fileActionBusy) return;
+            setFileActionSheet(null);
+          }}
+        >
+          <div
+            className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="text-lg font-black text-gray-900">파일 열기</div>
+              <div className="mt-1 text-xs text-gray-400 font-bold truncate">{fileActionSheet.name}</div>
+            </div>
+            <div className="border-t">
+              <button
+                type="button"
+                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50"
+                disabled={fileActionBusy}
+                onClick={() => {
+                  doOpenFile(fileActionSheet);
+                  setFileActionSheet(null);
+                }}
+              >
+                파일 열기
+              </button>
+              <button
+                type="button"
+                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50 border-t"
+                disabled={fileActionBusy}
+                onClick={async () => {
+                  await doSaveFile(fileActionSheet);
+                  setFileActionSheet(null);
+                }}
+              >
+                이 휴대폰에 저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
