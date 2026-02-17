@@ -17,6 +17,8 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
 
   const longPressTimerRef = useRef<number | null>(null);
   const [actionSheet, setActionSheet] = useState<{ kind: 'img' | 'file'; index: number } | null>(null);
+  const [fileOpenSheet, setFileOpenSheet] = useState<{ docIndex: number } | null>(null);
+
 
   const openActionSheetFromTarget = (target: HTMLElement | null) => {
     if (!target) return;
@@ -93,6 +95,31 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     openActionSheetFromTarget(target);
   };
 
+const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const target = e.target as HTMLElement | null;
+  if (!target) return;
+
+  // download icon click inside file card
+  const dl = target.closest('[data-file-dl]') as HTMLElement | null;
+  if (dl) {
+    const wrap = target.closest('[data-file-index]') as HTMLElement | null;
+    const idx = Number(wrap?.getAttribute('data-file-index') || '-1');
+    if (!Number.isFinite(idx) || idx < 0) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isMobile) {
+      setFileOpenSheet({ docIndex: idx });
+    } else {
+      const docs = getDocAttachments();
+      const att = docs[idx];
+      if (att) downloadAttachmentToDevice(att);
+    }
+  }
+};
+
+
 
   const [isMobile, setIsMobile] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
@@ -136,8 +163,15 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
           html.push('<br/>');
         } else if (kind === 'file') {
           html.push(
-            `<div data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);width:100%;box-sizing:border-box;">
-              <div data-file-name="1" style="font-weight:700;font-size:14px;color:#111827;word-break:break-all;">파일</div>
+            `<div data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);width:100%;box-sizing:border-box;">
+              <div data-file-name="1" style="flex:1;font-weight:700;font-size:14px;color:#111827;word-break:break-all;">파일</div>
+              <button type="button" data-file-dl="1" style="width:44px;height:44px;border-radius:14px;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;cursor:pointer;">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <path d="M7 10l5 5 5-5"/>
+                  <path d="M12 15V3"/>
+                </svg>
+              </button>
             </div>`
           );
           html.push('<br/>');
@@ -188,6 +222,52 @@ useEffect(() => {
     const fixed = idx === 0 ? 0 : 1;
     return `${size.toFixed(fixed)}${units[idx]}`;
   };
+
+
+const makeBlobFromAttachment = async (att: PostAttachment): Promise<Blob> => {
+  const data = att.data || '';
+  // data may already be a data: url
+  if (data.startsWith('data:')) {
+    const res = await fetch(data);
+    return await res.blob();
+  }
+  // otherwise assume raw base64 without prefix
+  const b64 = data.includes(',') ? data.split(',').pop() || '' : data;
+  const byteStr = atob(b64);
+  const bytes = new Uint8Array(byteStr.length);
+  for (let i = 0; i < byteStr.length; i++) bytes[i] = byteStr.charCodeAt(i);
+  return new Blob([bytes], { type: att.type || 'application/octet-stream' });
+};
+
+const openAttachmentInNewTab = async (att: PostAttachment) => {
+  try {
+    const blob = await makeBlobFromAttachment(att);
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    // cleanup later
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (e) {
+    console.error(e);
+    alert('파일을 열 수 없습니다.');
+  }
+};
+
+const downloadAttachmentToDevice = async (att: PostAttachment) => {
+  try {
+    const blob = await makeBlobFromAttachment(att);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = att.name || 'download';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (e) {
+    console.error(e);
+    alert('파일을 저장할 수 없습니다.');
+  }
+};
 
   const compressImage = (base64Str: string, maxWidth = 1200): Promise<string> => {
     return new Promise((resolve) => {
@@ -670,6 +750,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                 onInput={() => setContent(serializeEditorToContent())}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleEditorDrop}
+                onClick={handleEditorClick}
                 onTouchStart={handleEditorTouchStart}
                 onTouchEnd={handleEditorTouchEnd}
                 onTouchCancel={handleEditorTouchEnd}
@@ -680,7 +761,43 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
         </div>
 
         
-        {isMobile && actionSheet && (
+        
+
+{isMobile && fileOpenSheet && (
+  <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => setFileOpenSheet(null)}>
+    <div className="w-[88%] max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="px-6 py-5 text-center font-bold text-lg text-gray-900">파일</div>
+      <div className="border-t">
+        <button
+          type="button"
+          className="w-full py-5 text-center text-base font-medium active:bg-gray-50"
+          onClick={async () => {
+            const docs = getDocAttachments();
+            const att = docs[fileOpenSheet.docIndex];
+            setFileOpenSheet(null);
+            if (att) await openAttachmentInNewTab(att);
+          }}
+        >
+          파일 열기
+        </button>
+        <div className="h-px bg-gray-200" />
+        <button
+          type="button"
+          className="w-full py-5 text-center text-base font-medium active:bg-gray-50"
+          onClick={async () => {
+            const docs = getDocAttachments();
+            const att = docs[fileOpenSheet.docIndex];
+            setFileOpenSheet(null);
+            if (att) await downloadAttachmentToDevice(att);
+          }}
+        >
+          이 휴대폰에 저장
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{isMobile && actionSheet && (
           <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40">
             <div className="w-full max-w-md rounded-t-3xl bg-white p-4 shadow-2xl">
               <div className="text-sm font-bold text-gray-800 mb-2">첨부 항목</div>
