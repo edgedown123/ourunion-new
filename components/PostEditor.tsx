@@ -430,7 +430,7 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (kind === 'img') {
           html.push(
             `<div data-img-wrap="1" data-img-index="${idx}" contenteditable="false" style="position:relative;margin:10px 0;width:100%;box-sizing:border-box;">
-            <button type="button" data-img-del="1" aria-label="삭제" style="position:absolute;left:8px;top:8px;width:28px;height:28px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);background:rgba(15, 23, 42, 0.55);backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;padding:0;">
+            <button type="button" data-img-del="1" aria-label="삭제" style="position:absolute;left:2px;top:2px;width:28px;height:28px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);background:rgba(15, 23, 42, 0.55);backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;padding:0;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M18 6L6 18"/>
                 <path d="M6 6l12 12"/>
@@ -443,7 +443,7 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
         } else if (kind === 'file') {
           html.push(
             `<div data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="position:relative;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);width:100%;box-sizing:border-box;">
-              <button type="button" data-file-del="1" aria-label="삭제" style="position:absolute;left:8px;top:8px;width:28px;height:28px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);background:rgba(15, 23, 42, 0.55);backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;padding:0;">
+              <button type="button" data-file-del="1" aria-label="삭제" style="position:absolute;left:2px;top:2px;width:28px;height:28px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);background:rgba(15, 23, 42, 0.55);backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;padding:0;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                   <path d="M18 6L6 18"/>
                   <path d="M6 6l12 12"/>
@@ -511,8 +511,8 @@ useEffect(() => {
 
   const applyFancyDeleteButtonStyle = (btn: HTMLButtonElement, size = 28) => {
     btn.style.position = 'absolute';
-    btn.style.left = '8px';
-    btn.style.top = '8px';
+    btn.style.left = '2px';
+    btn.style.top = '2px';
     btn.style.width = `${size}px`;
     btn.style.height = `${size}px`;
     btn.style.borderRadius = `${Math.floor(size / 2)}px`;
