@@ -81,6 +81,7 @@ export default async function handler(req, res) {
     if (!record) return res.status(400).json({ ok: false, error: "Missing record in webhook payload" });
 
     const board = getBoardKey(record) || "free";
+    const isDispatch = String(board).startsWith("dispatch");
     const postId = record.id ?? record.post_id ?? record.uuid ?? null;
 
     const title = payload.title || "우리노동조합";
@@ -89,7 +90,7 @@ export default async function handler(req, res) {
       (board === "notice_all" ? "공고/공지에 새 글이 등록되었습니다."
         : board === "family_events" ? "경조사 게시판에 새 글이 등록되었습니다."
         : board === "resources" ? "자료실에 새 자료가 업로드되었습니다."
-        : board === "dispatch" ? "배차표에 새 글이 등록되었습니다."
+        : isDispatch ? "배차표에 새 글이 등록되었습니다."
         : "자유게시판에 새 글이 등록되었습니다.");
 
     const url = postId ? `/#tab=${encodeURIComponent(board)}&id=${encodeURIComponent(String(postId))}`
