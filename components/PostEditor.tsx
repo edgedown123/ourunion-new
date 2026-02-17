@@ -137,9 +137,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
         } else if (kind === 'file') {
           html.push(
             `<div data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);width:100%;box-sizing:border-box;">
-              <div style="width:38px;height:38px;border-radius:10px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;">
-                <span data-file-ext="1" style="font-size:11px;font-weight:900;color:#4b5563;letter-spacing:0.5px;">FILE</span>
-              </div>
               <div data-file-name="1" style="font-weight:700;font-size:14px;color:#111827;word-break:break-all;">파일</div>
             </div>`
           );
@@ -242,17 +239,9 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     for (const n of nodes) {
       const idx = Number(n.getAttribute('data-file-index') || '-1');
       const nameEl = n.querySelector('[data-file-name]') as HTMLElement | null;
-      const extEl = n.querySelector('[data-file-ext]') as HTMLElement | null;
       const name = docs[idx]?.name || '첨부파일';
       if (nameEl) nameEl.textContent = name;
       else n.textContent = name;
-
-      if (extEl) {
-        const trimmed = (name || '').trim();
-        const last = trimmed.lastIndexOf('.');
-        const ext = last > 0 && last < trimmed.length - 1 ? trimmed.slice(last + 1).toUpperCase().slice(0, 5) : 'FILE';
-        extEl.textContent = ext || 'FILE';
-      }
     }
   };
 
@@ -299,23 +288,6 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     card.style.width = '100%';
     card.style.boxSizing = 'border-box';
 
-    const icon = document.createElement('div');
-    icon.style.width = '38px';
-    icon.style.height = '38px';
-    icon.style.borderRadius = '10px';
-    icon.style.background = '#f3f4f6';
-    icon.style.display = 'flex';
-    icon.style.alignItems = 'center';
-    icon.style.justifyContent = 'center';
-    const extSpan = document.createElement('span');
-    extSpan.setAttribute('data-file-ext', '1');
-    extSpan.style.fontSize = '11px';
-    extSpan.style.fontWeight = '900';
-    extSpan.style.color = '#4b5563';
-    extSpan.style.letterSpacing = '0.5px';
-    extSpan.textContent = 'FILE';
-    icon.appendChild(extSpan);
-
     const name = document.createElement('div');
     name.setAttribute('data-file-name', '1');
     name.style.fontWeight = '700';
@@ -324,7 +296,6 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     name.style.wordBreak = 'break-all';
     name.textContent = getDocAttachments()[docIndex]?.name || '첨부파일';
 
-    card.appendChild(icon);
     card.appendChild(name);
 
     // 데스크톱: 클릭 삭제

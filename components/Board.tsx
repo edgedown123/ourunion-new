@@ -51,6 +51,10 @@ const Board: React.FC<BoardProps> = ({
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const [replyContent, setReplyContent] = useState('');
 
+  // 모바일 파일 카드: 열기/저장 액션시트
+  const [fileActionSheet, setFileActionSheet] = useState<{ name: string; data: string } | null>(null);
+  const [fileActionBusy, setFileActionBusy] = useState(false);
+
   // 페이징
   const [page, setPage] = useState(1);
   const [noticeAllPage, setNoticeAllPage] = useState(1);
@@ -302,6 +306,48 @@ const Board: React.FC<BoardProps> = ({
     };
 
 
+  const openMobileFileSheet = (f: { name?: string; data: string }) => {
+    if (!isMobile) return;
+    setFileActionSheet({ name: (f.name || "파일").toString(), data: f.data });
+  };
+
+  const doOpenFile = (f: { name?: string; data: string }) => {
+    try {
+      const a = document.createElement("a");
+      a.href = f.data;
+      a.target = "_blank";
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (e) {
+      console.error("파일 열기 실패:", e);
+      alert("파일을 열 수 없습니다.");
+    }
+  };
+
+  const doSaveFile = async (f: { name?: string; data: string }) => {
+    try {
+      setFileActionBusy(true);
+      const res = await fetch(f.data);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = (f.name || "file").toString();
+      a.rel = "noopener";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) {
+      console.error("파일 저장 실패:", e);
+      alert("저장에 실패했습니다.");
+    } finally {
+      setFileActionBusy(false);
+    }
+  };
+
 const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[]; used: Set<number> } => {
   // Supabase/레거시 데이터에서 content가 null/undefined로 들어올 수 있어 안전 처리
   const safeRaw =
@@ -365,12 +411,6 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
         } else if (kind === 'file') {
           if (!Number.isNaN(idx) && docAttachments?.[idx]) {
             const f = docAttachments[idx];
-            const ext = (() => {
-              const n = (f?.name || '').trim();
-              const last = n.lastIndexOf('.');
-              if (last <= 0 || last === n.length - 1) return 'FILE';
-              return n.slice(last + 1).toUpperCase().slice(0, 5);
-            })();
             nodes.push(
               <div
                 key={`file-${i}`}
@@ -378,41 +418,33 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                 onContextMenu={(e) => {
                   if (!isMobile) return;
                   e.preventDefault();
-                  const open = confirm('파일을 열거나 저장할까요? (확인: 열기/다운로드)');
-                  if (open) {
-                    const a = document.createElement('a');
-                    a.href = f.data;
-                    a.download = f.name || 'file';
-                    a.rel = 'noopener';
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                  }
+                  openMobileFileSheet(f);
+                }}
+                onClick={() => {
+                  if (!isMobile) return;
+                  openMobileFileSheet(f);
                 }}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
-                    <span className="text-[11px] font-black text-gray-600 tracking-wide">{ext}</span>
-                  </div>
                   <div className="min-w-0">
                     <div className="font-bold text-sm text-gray-800 truncate">{f.name}</div>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center font-black"
-                  onClick={() => {
-                    const a = document.createElement('a');
-                    a.href = f.data;
-                    a.download = f.name || 'file';
-                    a.rel = 'noopener';
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
+                  className="w-11 h-11 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isMobile) openMobileFileSheet(f);
+                    else doSaveFile(f);
                   }}
                   aria-label="다운로드"
                 >
-                  <span className="text-xl leading-none">↓</span>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 3v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    <path d="M8 11l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M4 17v3h16v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
                 </button>
               </div>
             );
@@ -964,6 +996,50 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
         </div>
       )}
     </div>
+      {isMobile && fileActionSheet && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
+          onClick={() => {
+            if (fileActionBusy) return;
+            setFileActionSheet(null);
+          }}
+        >
+          <div
+            className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 pt-6 pb-4 text-center">
+              <div className="text-lg font-black text-gray-900">파일 열기</div>
+              <div className="mt-1 text-xs text-gray-400 font-bold truncate">{fileActionSheet.name}</div>
+            </div>
+            <div className="border-t">
+              <button
+                type="button"
+                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50"
+                disabled={fileActionBusy}
+                onClick={() => {
+                  doOpenFile(fileActionSheet);
+                  setFileActionSheet(null);
+                }}
+              >
+                파일 열기
+              </button>
+              <button
+                type="button"
+                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50 border-t"
+                disabled={fileActionBusy}
+                onClick={async () => {
+                  await doSaveFile(fileActionSheet);
+                  setFileActionSheet(null);
+                }}
+              >
+                이 휴대폰에 저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
   );
 };
 
