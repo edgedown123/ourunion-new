@@ -1,5 +1,18 @@
 
-export type BoardType = 'intro' | 'notice_all' | 'family_events' | 'free' | 'resources' | 'signup' | 'trash';
+// 게시판 타입
+// - dispatch_* : 배차표(진관/도봉/송파)
+export type BoardType =
+  | 'intro'
+  | 'notice_all'
+  | 'family_events'
+  | 'dispatch'
+  | 'dispatch_jinkwan'
+  | 'dispatch_dobong'
+  | 'dispatch_songpa'
+  | 'free'
+  | 'resources'
+  | 'signup'
+  | 'trash';
 export type UserRole = 'guest' | 'member' | 'admin';
 
 export interface PostAttachment {

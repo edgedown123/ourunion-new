@@ -49,12 +49,7 @@ export const INITIAL_SETTINGS: SiteSettings = {
       phone: '02-555-5555',
       mapImageUrl: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&q=80&w=1200'
     }
-  ],
-  dispatchSheets: {
-    jinkwan: '',
-    dobong: '',
-    songpa: '',
-  }
+  ]
 };
 
 export const INITIAL_POSTS: Post[] = [

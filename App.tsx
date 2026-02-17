@@ -9,7 +9,7 @@ import PushOnboardingCard from './components/PushOnboardingCard';
 import Board from './components/Board';
 import NoticeLanding from './components/NoticeLanding';
 import NoticeSingle from './components/NoticeSingle';
-import { DispatchLanding, DispatchSheetView } from './components/DispatchSheet';
+import { DispatchLanding } from './components/DispatchSheet';
 import AdminPanel from './components/AdminPanel';
 import PostEditor from './components/PostEditor';
 import Introduction from './components/Introduction';
@@ -151,7 +151,17 @@ const App: React.FC = () => {
   useEffect(() => {
     if (userRole !== 'guest') return;
 
-    const guestRestricted = new Set(['notice', 'notice_all', 'family_events', 'free', 'resources']);
+    const guestRestricted = new Set([
+      'notice',
+      'notice_all',
+      'family_events',
+      'dispatch',
+      'dispatch_jinkwan',
+      'dispatch_dobong',
+      'dispatch_songpa',
+      'free',
+      'resources',
+    ]);
     if (!guestRestricted.has(activeTab)) return;
 
     // 회원 전용 안내 팝업 + 홈으로 돌려보내기
@@ -360,6 +370,35 @@ const App: React.FC = () => {
     });
   }, []);
 
+  // ---------------------------------------------
+  // 배차표(트래픽 관리): 업로드 후 120시간(5일) 지난 글 자동 정리
+  // - Supabase RLS 정책에 따라 삭제가 실패할 수 있으므로 best-effort로 처리
+  // - 앱이 죽지 않도록 항상 조용히 실패 처리
+  // ---------------------------------------------
+  const DISPATCH_TTL_MS = 120 * 60 * 60 * 1000;
+  const pruneExpiredDispatchPosts = useCallback((list: Post[]) => {
+    const now = Date.now();
+    const expiredIds: string[] = [];
+    const next = (Array.isArray(list) ? list : []).filter((p) => {
+      const t = (p?.type || '') as string;
+      if (!t.startsWith('dispatch_')) return true;
+      const ts = new Date(p?.createdAt || '').getTime();
+      if (!ts || Number.isNaN(ts)) return true; // createdAt 없으면 보존
+      const expired = now - ts > DISPATCH_TTL_MS;
+      if (expired) expiredIds.push(p.id);
+      return !expired;
+    });
+
+    // 클라우드에서도 best-effort 삭제
+    if (expiredIds.length && cloud.isSupabaseEnabled()) {
+      expiredIds.forEach((id) => {
+        cloud.deletePostFromCloud(id).catch(() => {});
+      });
+    }
+
+    return next;
+  }, []);
+
   const syncData = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
     else setIsRefreshing(true);
@@ -378,7 +417,7 @@ const App: React.FC = () => {
             cloud.fetchSettingsFromCloud(),
           ]);
 
-          if (pData) setPosts((prev) => mergePostsPreserveDetail(prev, pData));
+          if (pData) setPosts((prev) => pruneExpiredDispatchPosts(mergePostsPreserveDetail(prev, pData)));
           if (mData) {
             setMembers(mData);
             localStorage.setItem('union_members', JSON.stringify(mData));
@@ -390,7 +429,7 @@ const App: React.FC = () => {
             cloud.fetchPostsFromCloud(),
             cloud.fetchMembersFromCloud(),
           ]);
-          if (pData) setPosts((prev) => mergePostsPreserveDetail(prev, pData));
+          if (pData) setPosts((prev) => pruneExpiredDispatchPosts(mergePostsPreserveDetail(prev, pData)));
           if (mData) {
             setMembers(mData);
             localStorage.setItem('union_members', JSON.stringify(mData));
@@ -400,7 +439,7 @@ const App: React.FC = () => {
         const sPosts = localStorage.getItem('union_posts');
         const sMembers = localStorage.getItem('union_members');
         const sSettings = localStorage.getItem('union_settings');
-        if (sPosts) setPosts(JSON.parse(sPosts));
+        if (sPosts) setPosts(pruneExpiredDispatchPosts(JSON.parse(sPosts)));
         if (sMembers) setMembers(JSON.parse(sMembers));
         if (sSettings) setSettings(JSON.parse(sSettings));
       }
@@ -1327,14 +1366,25 @@ await cloud.deleteMemberFromCloud(user.id);
         ) : activeTab === 'dispatch' ? (
           <DispatchLanding onSelect={handleTabChange} />
         ) : ['dispatch_jinkwan', 'dispatch_dobong', 'dispatch_songpa'].includes(activeTab) ? (
-          <DispatchSheetView
-            area={(activeTab === 'dispatch_jinkwan'
-              ? 'jinkwan'
-              : activeTab === 'dispatch_dobong'
-                ? 'dobong'
-                : 'songpa')}
-            settings={settings}
-          />
+          <div className="relative">
+            <Board
+              key={`${activeTab}:${selectedPostId || 'list'}:${isWriting ? 'w' : 'r'}`}
+              type={activeTab as BoardType}
+              posts={posts}
+              onWriteClick={handleWriteClick}
+              onEditClick={handleEditClick}
+              selectedPostId={selectedPostId}
+              onSelectPost={handleSelectPost}
+              userRole={userRole}
+              onDeletePost={handleDeletePost}
+              onTogglePin={handleTogglePinPost}
+              onSaveComment={handleSaveComment}
+              onEditComment={handleEditComment}
+              onDeleteComment={handleDeleteComment}
+              currentUserName={userRole === 'admin' ? '관리자' : (loggedInMember?.name || '조합원')}
+              currentUserId={userRole === 'admin' ? 'admin' : (loggedInMember?.id || '')}
+            />
+          </div>
         ) : (
           <div className="relative">
             <Board 

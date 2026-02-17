@@ -1,5 +1,5 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Post, BoardType, UserRole, Comment } from '../types';
 import { NAV_ITEMS } from '../constants';
 
@@ -59,6 +59,24 @@ const Board: React.FC<BoardProps> = ({
   const [imageActionSheet, setImageActionSheet] = useState<{ name: string; data: string } | null>(null);
   const [imageActionBusy, setImageActionBusy] = useState(false);
   const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
+
+  // 이미지 확대/줌(핀치줌/휠줌) 상태
+  const [imgScale, setImgScale] = useState(1);
+  const [imgOffset, setImgOffset] = useState({ x: 0, y: 0 });
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const lastDistRef = useRef<number | null>(null);
+  const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  useEffect(() => {
+    // 새 이미지 열릴 때마다 초기화
+    if (imageViewerUrl) {
+      setImgScale(1);
+      setImgOffset({ x: 0, y: 0 });
+      pointersRef.current.clear();
+      lastDistRef.current = null;
+      panStartRef.current = null;
+    }
+  }, [imageViewerUrl]);
 
 
   // 페이징
@@ -990,12 +1008,97 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
     >
       ✕
     </button>
-    <img
-      src={imageViewerUrl}
-      alt="preview"
-      className="max-h-[92vh] max-w-[96vw] object-contain rounded-lg"
+
+    {/*
+      확대/줌 뷰어
+      - 모바일: 핀치 줌 + (확대 상태에서) 드래그 이동
+      - 데스크톱: 마우스 휠 줌 + 드래그 이동
+    */}
+    <div
+      className="max-h-[92vh] max-w-[96vw] overflow-hidden rounded-lg"
+      style={{ touchAction: 'none' }}
       onClick={(e) => e.stopPropagation()}
-    />
+      onDoubleClick={() => {
+        setImgScale(1);
+        setImgOffset({ x: 0, y: 0 });
+      }}
+      onWheel={(e) => {
+        // 데스크톱 휠 줌
+        e.preventDefault();
+        const delta = -e.deltaY;
+        setImgScale((s) => {
+          const next = Math.min(5, Math.max(1, s + delta * 0.001));
+          if (next === 1) setImgOffset({ x: 0, y: 0 });
+          return next;
+        });
+      }}
+      onPointerDown={(e) => {
+        (e.currentTarget as any).setPointerCapture?.(e.pointerId);
+        pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (pointersRef.current.size === 1) {
+          panStartRef.current = { x: e.clientX, y: e.clientY, ox: imgOffset.x, oy: imgOffset.y };
+        }
+        if (pointersRef.current.size === 2) {
+          const pts = Array.from(pointersRef.current.values());
+          const dx = pts[0].x - pts[1].x;
+          const dy = pts[0].y - pts[1].y;
+          lastDistRef.current = Math.hypot(dx, dy);
+          panStartRef.current = null;
+        }
+      }}
+      onPointerMove={(e) => {
+        if (!pointersRef.current.has(e.pointerId)) return;
+        pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+        // Pinch (2 pointers)
+        if (pointersRef.current.size === 2) {
+          const pts = Array.from(pointersRef.current.values());
+          const dx = pts[0].x - pts[1].x;
+          const dy = pts[0].y - pts[1].y;
+          const dist = Math.hypot(dx, dy);
+          const last = lastDistRef.current;
+          if (last && last > 0) {
+            const ratio = dist / last;
+            setImgScale((s) => {
+              const next = Math.min(5, Math.max(1, s * ratio));
+              return next;
+            });
+          }
+          lastDistRef.current = dist;
+          return;
+        }
+
+        // Pan (1 pointer) - only when zoomed
+        if (pointersRef.current.size === 1 && imgScale > 1 && panStartRef.current) {
+          const dx = e.clientX - panStartRef.current.x;
+          const dy = e.clientY - panStartRef.current.y;
+          setImgOffset({ x: panStartRef.current.ox + dx, y: panStartRef.current.oy + dy });
+        }
+      }}
+      onPointerUp={(e) => {
+        pointersRef.current.delete(e.pointerId);
+        if (pointersRef.current.size < 2) lastDistRef.current = null;
+        if (pointersRef.current.size === 0) panStartRef.current = null;
+        if (imgScale <= 1) setImgOffset({ x: 0, y: 0 });
+      }}
+      onPointerCancel={(e) => {
+        pointersRef.current.delete(e.pointerId);
+        if (pointersRef.current.size < 2) lastDistRef.current = null;
+        if (pointersRef.current.size === 0) panStartRef.current = null;
+        if (imgScale <= 1) setImgOffset({ x: 0, y: 0 });
+      }}
+    >
+      <img
+        src={imageViewerUrl}
+        alt="preview"
+        draggable={false}
+        className="block max-h-[92vh] max-w-[96vw] object-contain"
+        style={{
+          transform: `translate(${imgOffset.x}px, ${imgOffset.y}px) scale(${imgScale})`,
+          transformOrigin: 'center center',
+        }}
+      />
+    </div>
   </div>
 )}
 
@@ -1146,7 +1249,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
           </h2>
           <p className="text-gray-400 font-bold text-xs mt-2 ml-1">우리노동조합 소통 공간</p>
         </div>
-        {userRole !== 'guest' && (userRole === 'admin' || type === 'free' || type === 'resources') && type !== 'notice' && (
+        {userRole !== 'guest' && (userRole === 'admin' || type === 'free' || type === 'resources' || (typeof type === 'string' && type.startsWith('dispatch_'))) && type !== 'notice' && (
           <button 
             onClick={() => onWriteClick(type)} 
             className="bg-sky-primary text-white px-4 py-2 md:px-8 md:py-4 rounded-xl md:rounded-[1.5rem] font-black text-xs md:text-base shadow-xl shadow-sky-100 hover:opacity-90 active:scale-95 transition-all"

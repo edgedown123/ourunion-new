@@ -20,6 +20,23 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [imageOpenSheet, setImageOpenSheet] = useState<{ imgIndex: number } | null>(null);
   const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
 
+  // 이미지 확대/줌(핀치줌/휠줌)
+  const [imgScale, setImgScale] = useState(1);
+  const [imgOffset, setImgOffset] = useState({ x: 0, y: 0 });
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const lastDistRef = useRef<number | null>(null);
+  const panStartRef = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
+
+  useEffect(() => {
+    if (imageViewerUrl) {
+      setImgScale(1);
+      setImgOffset({ x: 0, y: 0 });
+      pointersRef.current.clear();
+      lastDistRef.current = null;
+      panStartRef.current = null;
+    }
+  }, [imageViewerUrl]);
+
   // --- Reorder (mobile: long-press + touch drag, desktop: mouse drag) ---
   const dragRef = useRef<{ active: boolean; node: HTMLElement | null; placeholder: HTMLElement | null; touchId: number | null; startY: number; offsetY: number; startX: number; offsetX: number; mode: 'touch' | 'mouse' | null; }>({ active: false, node: null, placeholder: null, touchId: null, startY: 0, offsetY: 0, startX: 0, offsetX: 0, mode: null });
 
