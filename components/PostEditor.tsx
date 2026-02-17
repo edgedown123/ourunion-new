@@ -19,6 +19,8 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [actionSheet, setActionSheet] = useState<{ kind: 'img' | 'file'; index: number } | null>(null);
   const [fileOpenSheet, setFileOpenSheet] = useState<{ docIndex: number } | null>(null);
   const [imageOpenSheet, setImageOpenSheet] = useState<{ imgIndex: number } | null>(null);
+  const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
+
 
 
   const openActionSheetFromTarget = (target: HTMLElement | null) => {
@@ -257,6 +259,29 @@ const openAttachmentInNewTab = async (att: PostAttachment) => {
     console.error(e);
     alert('파일을 열 수 없습니다.');
   }
+};
+
+
+
+const openImageInViewer = async (att: PostAttachment) => {
+  try {
+    const blob = await makeBlobFromAttachment(att);
+    const url = URL.createObjectURL(blob);
+    setImageViewerUrl((prev) => {
+      if (prev) URL.revokeObjectURL(prev);
+      return url;
+    });
+  } catch (e) {
+    console.error(e);
+    alert('이미지를 열 수 없습니다.');
+  }
+};
+
+const closeImageViewer = () => {
+  setImageViewerUrl((prev) => {
+    if (prev) URL.revokeObjectURL(prev);
+    return null;
+  });
 };
 
 const downloadAttachmentToDevice = async (att: PostAttachment) => {
@@ -781,7 +806,13 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             const docs = getDocAttachments();
             const att = docs[fileOpenSheet.docIndex];
             setFileOpenSheet(null);
-            if (att) await openAttachmentInNewTab(att);
+            if (att) {
+              if (isMobile) {
+                await openImageInViewer(att);
+              } else {
+                await openAttachmentInNewTab(att);
+              }
+            }
           }}
         >
           파일 열기
@@ -837,6 +868,30 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     </div>
   </div>
 )}
+
+
+{imageViewerUrl && (
+  <div className="fixed inset-0 z-[10010] bg-black/90 flex items-center justify-center" onClick={closeImageViewer}>
+    <button
+      type="button"
+      aria-label="닫기"
+      className="absolute top-4 right-4 rounded-full bg-white/20 px-3 py-2 text-white text-base"
+      onClick={(e) => {
+        e.stopPropagation();
+        closeImageViewer();
+      }}
+    >
+      ✕
+    </button>
+    <img
+      src={imageViewerUrl}
+      alt="preview"
+      className="max-h-[90vh] max-w-[94vw] object-contain rounded-lg"
+      onClick={(e) => e.stopPropagation()}
+    />
+  </div>
+)}
+
 {isMobile && actionSheet && (
           <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40">
             <div className="w-full max-w-md rounded-t-3xl bg-white p-4 shadow-2xl">

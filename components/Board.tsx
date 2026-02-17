@@ -58,6 +58,8 @@ const Board: React.FC<BoardProps> = ({
   // 이미지 카드: 열기/저장 액션시트(모바일/데스크톱 공통)
   const [imageActionSheet, setImageActionSheet] = useState<{ name: string; data: string } | null>(null);
   const [imageActionBusy, setImageActionBusy] = useState(false);
+  const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
+
 
   // 페이징
   const [page, setPage] = useState(1);
@@ -373,16 +375,17 @@ const Board: React.FC<BoardProps> = ({
 
   const doOpenImage = async (img: { name?: string; data: string }) => {
     try {
-      if (isMobile) {
-        const a = document.createElement('a');
-        a.href = img.data;
-        a.target = '_blank';
-        a.rel = 'noopener';
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        return;
-      }
+if (isMobile) {
+  setImageActionBusy(true);
+  const res = await fetch(img.data);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  setImageViewerUrl((prev) => {
+    if (prev) URL.revokeObjectURL(prev);
+    return url;
+  });
+  return;
+}
 
       setImageActionBusy(true);
       const res = await fetch(img.data);
@@ -419,6 +422,14 @@ const Board: React.FC<BoardProps> = ({
       setImageActionBusy(false);
     }
   };
+
+
+const closeImageViewer = () => {
+  setImageViewerUrl((prev) => {
+    if (prev) URL.revokeObjectURL(prev);
+    return null;
+  });
+};
 
 const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[]; used: Set<number> } => {
   // Supabase/레거시 데이터에서 content가 null/undefined로 들어올 수 있어 안전 처리
@@ -962,6 +973,32 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
       )}
 
       {/* 이미지카드 액션시트 */}
+
+{imageViewerUrl && (
+  <div
+    className="fixed inset-0 z-[10010] bg-black/90 flex items-center justify-center"
+    onClick={closeImageViewer}
+  >
+    <button
+      type="button"
+      aria-label="닫기"
+      className="absolute top-4 right-4 rounded-full bg-white/20 px-3 py-2 text-white text-base"
+      onClick={(e) => {
+        e.stopPropagation();
+        closeImageViewer();
+      }}
+    >
+      ✕
+    </button>
+    <img
+      src={imageViewerUrl}
+      alt="preview"
+      className="max-h-[92vh] max-w-[96vw] object-contain rounded-lg"
+      onClick={(e) => e.stopPropagation()}
+    />
+  </div>
+)}
+
       {imageActionSheet && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
