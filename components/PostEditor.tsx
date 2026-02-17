@@ -20,8 +20,10 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [imageOpenSheet, setImageOpenSheet] = useState<{ imgIndex: number } | null>(null);
   const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
 
-  // --- Mobile reorder (long-press + drag) ---
-  const dragRef = useRef<{ active: boolean; node: HTMLElement | null; placeholder: HTMLElement | null; touchId: number | null; startY: number; offsetY: number; }>({ active: false, node: null, placeholder: null, touchId: null, startY: 0, offsetY: 0 });
+  // --- Reorder (mobile: long-press + touch drag, desktop: mouse drag) ---
+  const dragRef = useRef<{ active: boolean; node: HTMLElement | null; placeholder: HTMLElement | null; touchId: number | null; startY: number; offsetY: number; startX: number; offsetX: number; mode: 'touch' | 'mouse' | null; }>({ active: false, node: null, placeholder: null, touchId: null, startY: 0, offsetY: 0, startX: 0, offsetX: 0, mode: null });
+
+  const mousePendingRef = useRef<{ down: boolean; startX: number; startY: number; target: HTMLElement | null }>({ down: false, startX: 0, startY: 0, target: null });
 
   const cleanupDrag = () => {
     const st = dragRef.current;
@@ -31,10 +33,13 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
       window.removeEventListener('touchmove', onWindowTouchMove as any);
       window.removeEventListener('touchend', onWindowTouchEnd as any);
       window.removeEventListener('touchcancel', onWindowTouchEnd as any);
+      window.removeEventListener('mousemove', onWindowMouseMove as any);
+      window.removeEventListener('mouseup', onWindowMouseUp as any);
     } catch {}
 
-    // restore body scroll
+    // restore body scroll / selection
     document.body.style.overflow = '';
+    (document.body.style as any).userSelect = '';
 
     const node = st.node;
     const ph = st.placeholder;
@@ -58,9 +63,21 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     st.node = null;
     st.placeholder = null;
     st.touchId = null;
+    st.mode = null;
 
     // persist new order in editor content
     setContent(serializeEditorToContent());
+  };
+
+  const cleanupMousePending = () => {
+    const p = mousePendingRef.current;
+    if (!p.down) return;
+    p.down = false;
+    p.target = null;
+    try {
+      window.removeEventListener('mousemove', onWindowMouseMovePending as any);
+      window.removeEventListener('mouseup', onWindowMouseUpPending as any);
+    } catch {}
   };
 
   const getTouchById = (e: TouchEvent, id: number | null) => {
@@ -100,6 +117,37 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     } else {
       target.parentNode.insertBefore(ph, target.nextSibling);
     }
+  };
+
+  const onWindowMouseMove = (e: MouseEvent) => {
+    const st = dragRef.current;
+    if (!st.active || !st.node) return;
+    e.preventDefault();
+    const x = e.clientX;
+    const y = e.clientY;
+
+    st.node.style.left = `${x - st.offsetX}px`;
+    st.node.style.top = `${y - st.offsetY}px`;
+
+    const elUnder = document.elementFromPoint(x, y) as HTMLElement | null;
+    const target = elUnder?.closest('img[data-img-index], [data-file-index]') as HTMLElement | null;
+    if (!target) return;
+    if (target === st.node) return;
+
+    const ph = st.placeholder;
+    if (!ph || !target.parentNode) return;
+
+    const rect = target.getBoundingClientRect();
+    const before = y < rect.top + rect.height / 2;
+    if (before) {
+      target.parentNode.insertBefore(ph, target);
+    } else {
+      target.parentNode.insertBefore(ph, target.nextSibling);
+    }
+  };
+
+  const onWindowMouseUp = (_e: MouseEvent) => {
+    cleanupDrag();
   };
 
   const onWindowTouchEnd = (_e: TouchEvent) => {
@@ -142,10 +190,56 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     st.touchId = touch.identifier;
     st.startY = touch.clientY;
     st.offsetY = touch.clientY - r.top;
+    st.startX = touch.clientX;
+    st.offsetX = touch.clientX - r.left;
+    st.mode = 'touch';
 
     window.addEventListener('touchmove', onWindowTouchMove as any, { passive: false });
     window.addEventListener('touchend', onWindowTouchEnd as any);
     window.addEventListener('touchcancel', onWindowTouchEnd as any);
+  };
+
+  const startMouseDragFromTarget = (target: HTMLElement, clientX: number, clientY: number) => {
+    const node = target.closest('img[data-img-index], [data-file-index]') as HTMLElement | null;
+    const editor = editorRef.current;
+    if (!node || !editor) return;
+
+    const r = node.getBoundingClientRect();
+    const ph = document.createElement('div');
+    ph.style.height = `${r.height}px`;
+    ph.style.margin = '6px 0';
+    ph.style.borderRadius = '12px';
+    ph.style.border = '2px dashed rgba(148,163,184,0.8)';
+    ph.style.background = 'rgba(148,163,184,0.08)';
+
+    node.parentNode?.insertBefore(ph, node);
+
+    node.classList.add('ring-2', 'ring-sky-400');
+    node.style.position = 'fixed';
+    node.style.left = `${r.left}px`;
+    node.style.top = `${r.top}px`;
+    node.style.width = `${r.width}px`;
+    node.style.zIndex = '9999';
+    node.style.transform = 'scale(1.02)';
+    node.style.pointerEvents = 'none';
+
+    // disable scroll + text selection while dragging (stability)
+    document.body.style.overflow = 'hidden';
+    (document.body.style as any).userSelect = 'none';
+
+    const st = dragRef.current;
+    st.active = true;
+    st.node = node;
+    st.placeholder = ph;
+    st.touchId = null;
+    st.startX = clientX;
+    st.startY = clientY;
+    st.offsetX = clientX - r.left;
+    st.offsetY = clientY - r.top;
+    st.mode = 'mouse';
+
+    window.addEventListener('mousemove', onWindowMouseMove as any);
+    window.addEventListener('mouseup', onWindowMouseUp as any);
   };
 
   const handleEditorTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -190,6 +284,39 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     longPressTimerRef.current = null;
     // 손을 떼면 드래그 종료
     if (dragRef.current.active) cleanupDrag();
+  };
+
+  const onWindowMouseMovePending = (e: MouseEvent) => {
+    const p = mousePendingRef.current;
+    if (!p.down) return;
+    const dx = Math.abs(e.clientX - p.startX);
+    const dy = Math.abs(e.clientY - p.startY);
+    if (dx + dy > 6) {
+      const target = p.target;
+      cleanupMousePending();
+      if (target) startMouseDragFromTarget(target, e.clientX, e.clientY);
+    }
+  };
+
+  const onWindowMouseUpPending = (_e: MouseEvent) => {
+    cleanupMousePending();
+  };
+
+  const handleEditorMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isMobile) return;
+    if (e.button !== 0) return;
+    if (dragRef.current.active) return;
+
+    const target = e.target as HTMLElement | null;
+    if (!target?.closest('img[data-img-index], [data-file-index]')) return;
+
+    mousePendingRef.current.down = true;
+    mousePendingRef.current.startX = e.clientX;
+    mousePendingRef.current.startY = e.clientY;
+    mousePendingRef.current.target = target;
+
+    window.addEventListener('mousemove', onWindowMouseMovePending as any);
+    window.addEventListener('mouseup', onWindowMouseUpPending as any);
   };
 const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
   const target = e.target as HTMLElement | null;
@@ -854,6 +981,13 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
           </div>
         )}
 
+        {!isMobile && (
+          <div className="mb-3 text-xs text-gray-500">
+            첨부: 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES}
+            <span className="ml-2 text-gray-400">(본문에서 마우스로 드래그하여 순서 변경)</span>
+          </div>
+        )}
+
         {isMobile && (
           <button
             type="button"
@@ -876,6 +1010,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleEditorDrop}
                 onClick={handleEditorClick}
+                onMouseDown={handleEditorMouseDown}
                 onTouchStart={handleEditorTouchStart}
                 onTouchEnd={handleEditorTouchEnd}
                 onTouchCancel={handleEditorTouchEnd}
