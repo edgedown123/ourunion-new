@@ -365,10 +365,16 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
         } else if (kind === 'file') {
           if (!Number.isNaN(idx) && docAttachments?.[idx]) {
             const f = docAttachments[idx];
+            const ext = (() => {
+              const n = (f?.name || '').trim();
+              const last = n.lastIndexOf('.');
+              if (last <= 0 || last === n.length - 1) return 'FILE';
+              return n.slice(last + 1).toUpperCase().slice(0, 5);
+            })();
             nodes.push(
               <div
                 key={`file-${i}`}
-                className="my-4 rounded-2xl border bg-white p-4 shadow-sm flex items-center justify-between gap-3"
+                className="my-4 w-[calc(100%+2rem)] -mx-4 rounded-2xl border bg-white p-4 shadow-sm flex items-center justify-between gap-3 md:w-[calc(100%+3rem)] md:-mx-6"
                 onContextMenu={(e) => {
                   if (!isMobile) return;
                   e.preventDefault();
@@ -385,15 +391,16 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                 }}
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">📎</div>
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                    <span className="text-[11px] font-black text-gray-600 tracking-wide">{ext}</span>
+                  </div>
                   <div className="min-w-0">
                     <div className="font-bold text-sm text-gray-800 truncate">{f.name}</div>
-                    <div className="text-xs text-gray-400">첨부파일</div>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="px-3 py-2 rounded-xl bg-sky-50 text-sky-700 font-bold text-xs"
+                  className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center font-black"
                   onClick={() => {
                     const a = document.createElement('a');
                     a.href = f.data;
@@ -403,8 +410,9 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                     a.click();
                     a.remove();
                   }}
+                  aria-label="다운로드"
                 >
-                  다운로드
+                  <span className="text-xl leading-none">↓</span>
                 </button>
               </div>
             );
