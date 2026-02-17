@@ -339,6 +339,31 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
   const target = e.target as HTMLElement | null;
   if (!target) return;
 
+  // delete button inside editor (create/edit)
+  const imgDel = target.closest('[data-img-del]') as HTMLElement | null;
+  if (imgDel) {
+    const wrap = target.closest('[data-img-wrap]') as HTMLElement | null;
+    const idx = Number(wrap?.getAttribute('data-img-index') || '-1');
+    if (Number.isFinite(idx) && idx >= 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeImageByImgIndex(idx);
+    }
+    return;
+  }
+
+  const fileDel = target.closest('[data-file-del]') as HTMLElement | null;
+  if (fileDel) {
+    const wrap = target.closest('[data-file-index]') as HTMLElement | null;
+    const idx = Number(wrap?.getAttribute('data-file-index') || '-1');
+    if (Number.isFinite(idx) && idx >= 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      removeFileByDocIndex(idx);
+    }
+    return;
+  }
+
   // image click inside editor -> open/save sheet
   const img = target.closest('img[data-img-index]') as HTMLElement | null;
   if (img) {
@@ -404,12 +429,26 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
       if (kind && idx != null) {
         if (kind === 'img') {
           html.push(
-            `<img data-attach-kind="img" data-img-index="${idx}" draggable="true" style="max-width:100%;border-radius:10px;margin:10px 0;display:block;" />`
+            `<div data-img-wrap="1" data-img-index="${idx}" contenteditable="false" style="position:relative;margin:10px 0;width:100%;box-sizing:border-box;">
+            <button type="button" data-img-del="1" aria-label="삭제" style="position:absolute;left:8px;top:8px;width:28px;height:28px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);background:rgba(15, 23, 42, 0.55);backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;padding:0;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6L6 18"/>
+                <path d="M6 6l12 12"/>
+              </svg>
+            </button>
+            <img data-attach-kind="img" data-img-index="${idx}" draggable="true" style="max-width:100%;border-radius:10px;display:block;" />
+          </div>`
           );
           html.push('<br/>');
         } else if (kind === 'file') {
           html.push(
-            `<div data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);width:100%;box-sizing:border-box;">
+            `<div data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="position:relative;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);width:100%;box-sizing:border-box;">
+              <button type="button" data-file-del="1" aria-label="삭제" style="position:absolute;left:8px;top:8px;width:28px;height:28px;border-radius:14px;border:1px solid rgba(255,255,255,0.18);background:rgba(15, 23, 42, 0.55);backdrop-filter:blur(6px);box-shadow:0 6px 18px rgba(0,0,0,0.18);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10;padding:0;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M18 6L6 18"/>
+                  <path d="M6 6l12 12"/>
+                </svg>
+              </button>
               <div data-file-name="1" style="flex:1;font-weight:700;font-size:14px;color:#111827;word-break:break-all;">파일</div>
               <button type="button" data-file-dl="1" style="width:44px;height:44px;border-radius:14px;border:1px solid #e5e7eb;background:#f8fafc;display:flex;align-items:center;justify-content:center;cursor:pointer;">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -467,6 +506,37 @@ useEffect(() => {
     }
     const fixed = idx === 0 ? 0 : 1;
     return `${size.toFixed(fixed)}${units[idx]}`;
+  };
+
+
+  const applyFancyDeleteButtonStyle = (btn: HTMLButtonElement, size = 28) => {
+    btn.style.position = 'absolute';
+    btn.style.left = '8px';
+    btn.style.top = '8px';
+    btn.style.width = `${size}px`;
+    btn.style.height = `${size}px`;
+    btn.style.borderRadius = `${Math.floor(size / 2)}px`;
+    btn.style.border = '1px solid rgba(255,255,255,0.18)';
+    btn.style.background = 'rgba(15, 23, 42, 0.55)'; // slate-900
+    (btn.style as any).backdropFilter = 'blur(6px)';
+    btn.style.boxShadow = '0 6px 18px rgba(0,0,0,0.18)';
+    btn.style.color = '#ffffff';
+    btn.style.display = 'flex';
+    btn.style.alignItems = 'center';
+    btn.style.justifyContent = 'center';
+    btn.style.padding = '0';
+    btn.style.cursor = 'pointer';
+    btn.style.zIndex = '10';
+    btn.style.userSelect = 'none';
+  };
+
+  const setDeleteIcon = (btn: HTMLButtonElement) => {
+    btn.innerHTML = `
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M18 6L6 18"/>
+        <path d="M6 6l12 12"/>
+      </svg>
+    `;
   };
 
 
@@ -643,20 +713,8 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     delBtn.type = 'button';
     delBtn.textContent = '×';
     delBtn.setAttribute('aria-label', '삭제');
-    delBtn.style.position = 'absolute';
-    delBtn.style.left = '6px';
-    delBtn.style.top = '6px';
-    delBtn.style.width = '22px';
-    delBtn.style.height = '22px';
-    delBtn.style.borderRadius = '11px';
-    delBtn.style.border = '1px solid rgba(0,0,0,0.15)';
-    delBtn.style.background = 'rgba(255,255,255,0.95)';
-    delBtn.style.color = '#111827';
-    delBtn.style.fontSize = '18px';
-    delBtn.style.lineHeight = '18px';
-    delBtn.style.padding = '0';
-    delBtn.style.cursor = 'pointer';
-    delBtn.style.zIndex = '5';
+    applyFancyDeleteButtonStyle(delBtn, 28);
+    setDeleteIcon(delBtn);
     delBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -832,20 +890,8 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     delBtn.type = 'button';
     delBtn.textContent = '×';
     delBtn.setAttribute('aria-label', '삭제');
-    delBtn.style.position = 'absolute';
-    delBtn.style.left = '6px';
-    delBtn.style.top = '6px';
-    delBtn.style.width = '24px';
-    delBtn.style.height = '24px';
-    delBtn.style.borderRadius = '12px';
-    delBtn.style.border = '1px solid rgba(0,0,0,0.15)';
-    delBtn.style.background = 'rgba(255,255,255,0.95)';
-    delBtn.style.color = '#111827';
-    delBtn.style.fontSize = '18px';
-    delBtn.style.lineHeight = '20px';
-    delBtn.style.padding = '0';
-    delBtn.style.cursor = 'pointer';
-    delBtn.style.zIndex = '5';
+    applyFancyDeleteButtonStyle(delBtn, 28);
+    setDeleteIcon(delBtn);
 
     delBtn.addEventListener('click', (e) => {
       e.preventDefault();
