@@ -15,129 +15,82 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-
-  // 모바일: 첨부 카드 롱프레스 → 드래그로 위치 이동
   const longPressTimerRef = useRef<number | null>(null);
-  const dragItemRef = useRef<HTMLElement | null>(null);
-  const isDraggingRef = useRef(false);
+  const [actionSheet, setActionSheet] = useState<{ kind: 'img' | 'file'; index: number } | null>(null);
 
-  const clearLongPressTimer = () => {
-    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
-  };
-
-  const getAttachItemFromTarget = (target: HTMLElement | null) => {
-    if (!target) return null;
-    // 버튼/아이콘을 눌러도 카드 전체를 잡을 수 있게 closest로 끌어올림
-    return (target.closest('[data-attach-item="1"]') as HTMLElement | null)
-      || (target.closest('img[data-img-index]') as HTMLElement | null)
-      || (target.closest('[data-file-index]') as HTMLElement | null);
-  };
-
-  const getBlockNodes = (item: HTMLElement) => {
-    // 카드 뒤에 붙어있는 <br/>도 함께 이동
-    const nodes: Node[] = [item];
-    const next = item.nextSibling as any;
-    if (next && next.tagName === 'BR') nodes.push(next);
-    return nodes;
-  };
-
-  const moveBlock = (dragItem: HTMLElement, targetItem: HTMLElement, before: boolean) => {
-    if (dragItem === targetItem) return;
-    const parent = targetItem.parentNode;
-    if (!parent) return;
-
-    const dragNodes = getBlockNodes(dragItem);
-    const targetNodes = getBlockNodes(targetItem);
-    const refNode = before
-      ? (targetItem as any)
-      : ((targetNodes[targetNodes.length - 1] as any).nextSibling as ChildNode | null);
-
-    // 이미 같은 위치면 무시
-    if (refNode === dragNodes[0]) return;
-
-    for (const n of dragNodes) {
-      if (n.parentNode) n.parentNode.removeChild(n);
+  const openActionSheetFromTarget = (target: HTMLElement | null) => {
+    if (!target) return;
+    const img = target.closest('img[data-img-index]') as HTMLElement | null;
+    if (img) {
+      const idx = Number(img.getAttribute('data-img-index') || '-1');
+      if (Number.isFinite(idx) && idx >= 0) setActionSheet({ kind: 'img', index: idx });
+      return;
     }
-    for (const n of dragNodes) {
-      parent.insertBefore(n, refNode);
+    const file = target.closest('[data-file-index]') as HTMLElement | null;
+    if (file) {
+      const idx = Number(file.getAttribute('data-file-index') || '-1');
+      if (Number.isFinite(idx) && idx >= 0) setActionSheet({ kind: 'file', index: idx });
     }
+  };
+
+  const moveAttachmentInEditor = (direction: 'up' | 'down') => {
+    const el = editorRef.current;
+    if (!el || !actionSheet) return;
+
+    const selector = actionSheet.kind === 'img'
+      ? `img[data-img-index="${actionSheet.index}"]`
+      : `[data-file-index="${actionSheet.index}"]`;
+
+    const node = el.querySelector(selector) as HTMLElement | null;
+    if (!node) return;
+
+    const items = Array.from(el.querySelectorAll('img[data-img-index], [data-file-index]')) as HTMLElement[];
+    const cur = items.indexOf(node);
+    if (cur === -1) return;
+
+    const nextIndex = direction === 'up' ? cur - 1 : cur + 1;
+    const neighbor = items[nextIndex];
+    if (!neighbor) return;
+
+    if (direction === 'up') {
+      neighbor.parentNode?.insertBefore(node, neighbor);
+    } else {
+      // insert after neighbor
+      neighbor.parentNode?.insertBefore(node, neighbor.nextSibling);
+    }
+    setContent(serializeEditorToContent());
+  };
+
+  const deleteAttachmentInEditor = () => {
+    if (!actionSheet) return;
+    if (actionSheet.kind === 'img') removeImageByImgIndex(actionSheet.index);
+    else removeFileByDocIndex(actionSheet.index);
+    setActionSheet(null);
   };
 
   const handleEditorTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!isMobile) return;
-    clearLongPressTimer();
-
     const target = e.target as HTMLElement | null;
-    const item = getAttachItemFromTarget(target);
-    if (!item) return;
+    // 첨부 요소에서만 롱프레스 동작
+    if (!target?.closest('img[data-img-index], [data-file-index]')) return;
 
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = window.setTimeout(() => {
-      const el = getAttachItemFromTarget(target);
-      if (!el) return;
-      isDraggingRef.current = true;
-      dragItemRef.current = el;
-      el.classList.add('opacity-60');
-      el.style.outline = '2px solid rgba(14,165,233,0.35)';
-      el.style.borderRadius = '14px';
-      // 드래그 시작 시 스크롤/제스처 방지
-      const editorEl = editorRef.current;
-      if (editorEl) (editorEl.style as any).touchAction = 'none';
-
-      // 드래그 시작 시 커서/선택 방지
-      (document.body as any).style.webkitUserSelect = 'none';
-      (document.body as any).style.userSelect = 'none';
-    }, 420);
-  };
-
-  const stopDragging = () => {
-    clearLongPressTimer();
-    const cur = dragItemRef.current;
-    if (cur) {
-      cur.classList.remove('opacity-60');
-      cur.style.outline = '';
-    }
-    dragItemRef.current = null;
-    isDraggingRef.current = false;
-    (document.body as any).style.webkitUserSelect = '';
-    (document.body as any).style.userSelect = '';
-    const editorEl = editorRef.current;
-    if (editorEl) (editorEl.style as any).touchAction = '';
-  };
-
-  const handleEditorTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!isMobile) return;
-    // 롱프레스 대기 중 손가락이 움직이면 드래그 모드 진입을 취소 (스크롤은 그대로 허용)
-    if (!isDraggingRef.current) {
-      clearLongPressTimer();
-      return;
-    }
-    if (!dragItemRef.current) return;
-
-    // 드래그 중엔 스크롤 방지
-    e.preventDefault();
-
-    const touch = e.touches[0];
-    if (!touch) return;
-
-    const elUnder = document.elementFromPoint(touch.clientX, touch.clientY) as HTMLElement | null;
-    const targetItem = getAttachItemFromTarget(elUnder);
-    const dragItem = dragItemRef.current;
-    if (!targetItem || targetItem === dragItem) return;
-
-    const editorEl = editorRef.current;
-    if (!editorEl || !editorEl.contains(targetItem) || !editorEl.contains(dragItem)) return;
-
-    const tRect = targetItem.getBoundingClientRect();
-    const before = touch.clientY < (tRect.top + tRect.height / 2);
-    moveBlock(dragItem, targetItem, before);
-
-    // 순서가 바뀌면 content 갱신
-    setContent(serializeEditorToContent());
+      openActionSheetFromTarget(target);
+    }, 450);
   };
 
   const handleEditorTouchEnd = () => {
-    stopDragging();
+    if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  };
+
+  const handleEditorContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMobile) return;
+    const target = e.target as HTMLElement | null;
+    if (!target?.closest('img[data-img-index], [data-file-index]')) return;
+    e.preventDefault();
+    openActionSheetFromTarget(target);
   };
 
 
@@ -178,18 +131,14 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
       if (kind && idx != null) {
         if (kind === 'img') {
           html.push(
-            `<div data-attach-item="1" data-attach-kind="img" contenteditable="false" style="position:relative;max-width:100%;margin:10px 0;">
-              <button type="button" data-attach-delete="img" data-img-index="${idx}" style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:999px;border:none;background:rgba(0,0,0,0.55);color:white;font-weight:900;line-height:26px;text-align:center;z-index:2;">×</button>
-              <img data-attach-kind="img" data-img-index="${idx}" style="max-width:100%;border-radius:10px;display:block;" />
-            </div>`
+            `<img data-attach-kind="img" data-img-index="${idx}" draggable="true" style="max-width:100%;border-radius:10px;margin:10px 0;display:block;" />`
           );
           html.push('<br/>');
         } else if (kind === 'file') {
           html.push(
-            `<div data-attach-item="1" data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="position:relative;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
-              <button type="button" data-attach-delete="file" data-file-index="${idx}" style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:999px;border:none;background:rgba(0,0,0,0.55);color:white;font-weight:900;line-height:26px;text-align:center;z-index:3;">×</button>
+            `<div data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
               <div style="width:38px;height:38px;border-radius:10px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:18px;">📎</div>
-              <div data-file-name="1" style="font-weight:700;font-size:14px;color:#111827;word-break:break-all;padding-right:34px;">첨부파일</div>
+              <div data-file-name="1" style="font-weight:700;font-size:14px;color:#111827;word-break:break-all;">첨부파일</div>
             </div>`
           );
           html.push('<br/>');
@@ -297,7 +246,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     }
   };
 
-const removeFileByDocIndex = (docIndex: number) => {
+  const removeFileByDocIndex = (docIndex: number) => {
     setAttachments(prev => {
       const images = prev.filter(isImageAttachment);
       const docs = prev.filter(isDocAttachment);
@@ -313,24 +262,18 @@ const removeFileByDocIndex = (docIndex: number) => {
       for (const n of nodes) {
         const idx = Number(n.getAttribute('data-file-index') || '-1');
         if (idx === docIndex) n.remove();
-        else if (idx > docIndex) {
-          const nextIdx = String(idx - 1);
-          n.setAttribute('data-file-index', nextIdx);
-          const btn = n.querySelector('button[data-attach-delete="file"]') as HTMLButtonElement | null;
-          if (btn) btn.setAttribute('data-file-index', nextIdx);
-        }
+        else if (idx > docIndex) n.setAttribute('data-file-index', String(idx - 1));
       }
       syncEditorFilesFromAttachments();
       setContent(serializeEditorToContent());
     });
   };
 
-const insertFileIntoEditor = (docIndex: number) => {
+  const insertFileIntoEditor = (docIndex: number) => {
     const el = editorRef.current;
     if (!el) return;
 
     const card = document.createElement('div');
-    card.setAttribute('data-attach-item', '1');
     card.setAttribute('data-file-index', String(docIndex));
     card.setAttribute('data-attach-kind', 'file');
     card.setAttribute('contenteditable', 'false');
@@ -343,32 +286,6 @@ const insertFileIntoEditor = (docIndex: number) => {
     card.style.background = '#fff';
     card.style.margin = '10px 0';
     card.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
-    card.style.position = 'relative';
-
-    const delBtn = document.createElement('button');
-    delBtn.type = 'button';
-    delBtn.textContent = '×';
-    delBtn.setAttribute('data-attach-delete', 'file');
-    delBtn.setAttribute('data-file-index', String(docIndex));
-    delBtn.style.position = 'absolute';
-    delBtn.style.top = '6px';
-    delBtn.style.right = '6px';
-    delBtn.style.width = '26px';
-    delBtn.style.height = '26px';
-    delBtn.style.borderRadius = '999px';
-    delBtn.style.border = 'none';
-    delBtn.style.background = 'rgba(0,0,0,0.55)';
-    delBtn.style.color = 'white';
-    delBtn.style.fontWeight = '900';
-    delBtn.style.lineHeight = '26px';
-    delBtn.style.textAlign = 'center';
-    delBtn.style.zIndex = '3';
-    delBtn.style.pointerEvents = 'auto';
-    delBtn.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      removeFileByDocIndex(docIndex);
-    });
 
     const icon = document.createElement('div');
     icon.style.width = '38px';
@@ -387,10 +304,8 @@ const insertFileIntoEditor = (docIndex: number) => {
     name.style.fontSize = '14px';
     name.style.color = '#111827';
     name.style.wordBreak = 'break-all';
-    name.style.paddingRight = '34px';
     name.textContent = getDocAttachments()[docIndex]?.name || '첨부파일';
 
-    card.appendChild(delBtn);
     card.appendChild(icon);
     card.appendChild(name);
 
@@ -439,23 +354,6 @@ const insertFileIntoEditor = (docIndex: number) => {
 
       const elem = node as HTMLElement;
       const tag = elem.tagName;
-
-
-      // 삭제 버튼 텍스트가 본문에 섞이지 않도록 무시
-      if (tag === 'BUTTON' && elem.hasAttribute('data-attach-delete')) {
-        return;
-      }
-
-      // 이미지 카드 래퍼(div)인 경우: 내부 img의 인덱스로 토큰 출력
-      if (elem.getAttribute('data-attach-kind') === 'img' && elem.getAttribute('data-attach-item') === '1') {
-        const inner = elem.querySelector('img[data-img-index]') as HTMLElement | null;
-        const idx = inner?.getAttribute('data-img-index') || '';
-        if (idx) {
-          out.push(`[[img:${idx}]]
-`);
-          return;
-        }
-      }
 
       if (tag === 'BR') {
         out.push('\n');
@@ -536,136 +434,55 @@ const insertFileIntoEditor = (docIndex: number) => {
       const el = editorRef.current;
       if (!el) return;
       const nodes = Array.from(el.querySelectorAll('img[data-img-index]')) as HTMLImageElement[];
-      for (const img of nodes) {
-        const idx = Number(img.getAttribute('data-img-index') || '-1');
-        const wrapper = (img.closest('[data-attach-kind="img"][data-attach-item="1"]') as HTMLElement | null);
-        const container = wrapper || (img as any);
-        if (idx === imgIndex) {
-          container.remove();
-        } else if (idx > imgIndex) {
-          const nextIdx = String(idx - 1);
-          img.setAttribute('data-img-index', nextIdx);
-          const btn = wrapper?.querySelector('button[data-attach-delete="img"]') as HTMLButtonElement | null;
-          if (btn) btn.setAttribute('data-img-index', nextIdx);
-        }
+      for (const n of nodes) {
+        const idx = Number(n.getAttribute('data-img-index') || '-1');
+        if (idx === imgIndex) n.remove();
+        else if (idx > imgIndex) n.setAttribute('data-img-index', String(idx - 1));
       }
       syncEditorImagesFromAttachments();
       setContent(serializeEditorToContent());
     });
   };
 
-  
-
-  
-
-  
-
-
-  // 편집기 내부(HTML로 렌더링된 카드)의 삭제 버튼은 이벤트 위임으로 처리
-  useEffect(() => {
-    const el = editorRef.current;
-    if (!el) return;
-
-    const onClick = (ev: MouseEvent) => {
-      const target = ev.target as HTMLElement | null;
-      const btn = target?.closest('button[data-attach-delete]') as HTMLButtonElement | null;
-      if (!btn) return;
-      ev.preventDefault();
-      ev.stopPropagation();
-
-      const kind = btn.getAttribute('data-attach-delete');
-      if (kind === 'img') {
-        const idx = Number(btn.getAttribute('data-img-index') || '-1');
-        if (Number.isFinite(idx) && idx >= 0) removeImageByImgIndex(idx);
-      } else if (kind === 'file') {
-        const idx = Number(btn.getAttribute('data-file-index') || '-1');
-        if (Number.isFinite(idx) && idx >= 0) removeFileByDocIndex(idx);
-      }
-    };
-
-    el.addEventListener('click', onClick);
-    return () => el.removeEventListener('click', onClick);
-  }, [attachments, isMobile]);
-
-const insertImageIntoEditor = (imgIndex: number, dataOverride?: string) => {
+  const insertImageIntoEditor = (imgIndex: number, dataOverride?: string) => {
     const el = editorRef.current;
     if (!el) return;
     const imgData = dataOverride || getImageAttachments()[imgIndex]?.data;
     if (!imgData) return;
 
-    const wrapper = document.createElement('div');
-    wrapper.setAttribute('data-attach-item', '1');
-    wrapper.setAttribute('data-attach-kind', 'img');
-    wrapper.setAttribute('contenteditable', 'false');
-    wrapper.setAttribute('draggable', 'true');
-    wrapper.style.position = 'relative';
-    wrapper.style.maxWidth = '100%';
-    wrapper.style.margin = '10px 0';
-
-    const del = document.createElement('button');
-    del.type = 'button';
-    del.textContent = '×';
-    del.setAttribute('data-attach-delete', 'img');
-    del.setAttribute('data-img-index', String(imgIndex));
-    del.style.position = 'absolute';
-    del.style.top = '6px';
-    del.style.right = '6px';
-    del.style.width = '26px';
-    del.style.height = '26px';
-    del.style.borderRadius = '999px';
-    del.style.border = 'none';
-    del.style.background = 'rgba(0,0,0,0.55)';
-    del.style.color = 'white';
-    del.style.fontWeight = '900';
-    del.style.lineHeight = '26px';
-    del.style.textAlign = 'center';
-    del.style.zIndex = '2';
-
     const img = document.createElement('img');
     img.src = imgData;
     img.setAttribute('data-attach-kind', 'img');
     img.setAttribute('data-img-index', String(imgIndex));
+    img.setAttribute('draggable', 'true');
     img.style.maxWidth = '100%';
     img.style.borderRadius = '10px';
+    img.style.margin = '10px 0';
     img.style.display = 'block';
 
-    wrapper.appendChild(del);
-    wrapper.appendChild(img);
-
-    // 데스크톱 드래그(기존 사용성 유지)
-    wrapper.addEventListener('dragstart', (e) => {
+    img.addEventListener('dragstart', (e) => {
       (e.dataTransfer as DataTransfer).setData('text/plain', String(imgIndex));
       (e.dataTransfer as DataTransfer).effectAllowed = 'move';
-      wrapper.classList.add('opacity-60');
+      img.classList.add('opacity-60');
     });
-    wrapper.addEventListener('dragend', () => wrapper.classList.remove('opacity-60'));
+    img.addEventListener('dragend', () => img.classList.remove('opacity-60'));
 
-    // 데스크톱: 카드 클릭 삭제(기존 동작 유지)
-    wrapper.addEventListener('click', (ev) => {
+    img.addEventListener('click', () => {
       if (isMobile) return;
-      const t = ev.target as HTMLElement | null;
-      if (t?.closest('button[data-attach-delete="img"]')) return;
       if (confirm('이 이미지를 삭제할까요?')) {
         removeImageByImgIndex(imgIndex);
       }
-    });
-
-    // 버튼은 이벤트 위임으로도 처리하지만, 여기선 즉시 반응 보장
-    del.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      removeImageByImgIndex(imgIndex);
     });
 
     const sel = window.getSelection?.();
     if (sel && sel.rangeCount > 0) {
       const range = sel.getRangeAt(0);
       if (!el.contains(range.startContainer)) {
-        el.appendChild(wrapper);
+        el.appendChild(img);
         el.appendChild(document.createElement('br'));
       } else {
         range.deleteContents();
-        range.insertNode(wrapper);
+        range.insertNode(img);
         range.collapse(false);
         range.insertNode(document.createElement('br'));
         range.collapse(false);
@@ -673,10 +490,9 @@ const insertImageIntoEditor = (imgIndex: number, dataOverride?: string) => {
         sel.addRange(range);
       }
     } else {
-      el.appendChild(wrapper);
+      el.appendChild(img);
       el.appendChild(document.createElement('br'));
     }
-
     setContent(serializeEditorToContent());
   };
 
@@ -688,17 +504,13 @@ const insertImageIntoEditor = (imgIndex: number, dataOverride?: string) => {
     if (!Number.isFinite(fromIndex) || fromIndex < 0) return;
 
     // 가장 가까운 img를 찾고 그 앞에 삽입
-    const target = (e.target as HTMLElement).closest('[data-attach-kind="img"][data-attach-item="1"]') as HTMLElement | null;
-    const dragged = (el.querySelector('img[data-img-index= + String(fromIndex) + ]') as HTMLElement | null)?.closest('[data-attach-kind="img"][data-attach-item="1"]') as HTMLElement | null;
+    const target = (e.target as HTMLElement).closest('img[data-img-index]') as HTMLImageElement | null;
+    const dragged = el.querySelector(`img[data-img-index="${fromIndex}"]`) as HTMLImageElement | null;
     if (!dragged) return;
 
-    if (target && dragged && target !== dragged) {
-      // dragged 다음 br도 함께 이동
-      const dragBr = (dragged.nextSibling as any)?.tagName === 'BR' ? dragged.nextSibling : null;
-      const ref = target;
-      target.parentNode?.insertBefore(dragged, ref);
-      if (dragBr) target.parentNode?.insertBefore(dragBr, dragged.nextSibling);
-      // 줄바꿈 보정
+    if (target && target !== dragged) {
+      target.parentNode?.insertBefore(dragged, target);
+      // 줄바꿈이 자연스럽게 유지되도록 br 하나 추가
       if (dragged.nextSibling && (dragged.nextSibling as any).tagName !== 'BR') {
         dragged.parentNode?.insertBefore(document.createElement('br'), dragged.nextSibling);
       }
@@ -844,7 +656,7 @@ const insertImageIntoEditor = (imgIndex: number, dataOverride?: string) => {
         {isMobile && (
           <div className="mb-3 text-xs text-gray-500">
             첨부: 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES}
-            <span className="ml-2 text-gray-400">(길게 눌러 드래그 이동 · X로 삭제)</span>
+            <span className="ml-2 text-gray-400">(본문에서 길게 눌러 이동/삭제)</span>
           </div>
         )}
 
@@ -870,13 +682,53 @@ const insertImageIntoEditor = (imgIndex: number, dataOverride?: string) => {
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={handleEditorDrop}
                 onTouchStart={handleEditorTouchStart}
-                onTouchMove={handleEditorTouchMove}
                 onTouchEnd={handleEditorTouchEnd}
                 onTouchCancel={handleEditorTouchEnd}
+                onContextMenu={handleEditorContextMenu}
                 className="w-full min-h-[260px] p-4 border rounded-lg bg-white focus:outline-none"
                 style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}
               />
         </div>
+
+        
+        {isMobile && actionSheet && (
+          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40">
+            <div className="w-full max-w-md rounded-t-3xl bg-white p-4 shadow-2xl">
+              <div className="text-sm font-bold text-gray-800 mb-2">첨부 항목</div>
+              <div className="text-xs text-gray-500 mb-4">길게 눌러 위치 이동 / 삭제</div>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  className="py-3 rounded-xl border font-bold text-sm"
+                  onClick={() => moveAttachmentInEditor('up')}
+                >
+                  위로
+                </button>
+                <button
+                  type="button"
+                  className="py-3 rounded-xl border font-bold text-sm"
+                  onClick={() => moveAttachmentInEditor('down')}
+                >
+                  아래로
+                </button>
+                <button
+                  type="button"
+                  className="py-3 rounded-xl border font-bold text-sm text-red-600"
+                  onClick={deleteAttachmentInEditor}
+                >
+                  삭제
+                </button>
+              </div>
+              <button
+                type="button"
+                className="mt-3 w-full py-3 rounded-xl bg-gray-100 font-bold text-sm"
+                onClick={() => setActionSheet(null)}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        )}
 
 <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
