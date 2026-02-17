@@ -80,6 +80,10 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
       el.classList.add('opacity-60');
       el.style.outline = '2px solid rgba(14,165,233,0.35)';
       el.style.borderRadius = '14px';
+      // 드래그 시작 시 스크롤/제스처 방지
+      const editorEl = editorRef.current;
+      if (editorEl) (editorEl.style as any).touchAction = 'none';
+
       // 드래그 시작 시 커서/선택 방지
       (document.body as any).style.webkitUserSelect = 'none';
       (document.body as any).style.userSelect = 'none';
@@ -97,11 +101,18 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     isDraggingRef.current = false;
     (document.body as any).style.webkitUserSelect = '';
     (document.body as any).style.userSelect = '';
+    const editorEl = editorRef.current;
+    if (editorEl) (editorEl.style as any).touchAction = '';
   };
 
   const handleEditorTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     if (!isMobile) return;
-    if (!isDraggingRef.current || !dragItemRef.current) return;
+    // 롱프레스 대기 중 손가락이 움직이면 드래그 모드 진입을 취소 (스크롤은 그대로 허용)
+    if (!isDraggingRef.current) {
+      clearLongPressTimer();
+      return;
+    }
+    if (!dragItemRef.current) return;
 
     // 드래그 중엔 스크롤 방지
     e.preventDefault();
@@ -176,7 +187,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
         } else if (kind === 'file') {
           html.push(
             `<div data-attach-item="1" data-attach-kind="file" data-file-index="${idx}" contenteditable="false" style="position:relative;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid #e5e7eb;border-radius:14px;background:#fff;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,0.04);">
-              <button type="button" data-attach-delete="file" data-file-index="${idx}" style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:999px;border:none;background:rgba(0,0,0,0.55);color:white;font-weight:900;line-height:26px;text-align:center;">×</button>
+              <button type="button" data-attach-delete="file" data-file-index="${idx}" style="position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:999px;border:none;background:rgba(0,0,0,0.55);color:white;font-weight:900;line-height:26px;text-align:center;z-index:3;">×</button>
               <div style="width:38px;height:38px;border-radius:10px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:18px;">📎</div>
               <div data-file-name="1" style="font-weight:700;font-size:14px;color:#111827;word-break:break-all;padding-right:34px;">첨부파일</div>
             </div>`
@@ -351,6 +362,8 @@ const insertFileIntoEditor = (docIndex: number) => {
     delBtn.style.fontWeight = '900';
     delBtn.style.lineHeight = '26px';
     delBtn.style.textAlign = 'center';
+    delBtn.style.zIndex = '3';
+    delBtn.style.pointerEvents = 'auto';
     delBtn.addEventListener('click', (ev) => {
       ev.preventDefault();
       ev.stopPropagation();
