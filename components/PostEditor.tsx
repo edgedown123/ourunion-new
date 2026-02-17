@@ -109,13 +109,7 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (isMobile) {
-      setFileOpenSheet({ docIndex: idx });
-    } else {
-      const docs = getDocAttachments();
-      const att = docs[idx];
-      if (att) downloadAttachmentToDevice(att);
-    }
+    setFileOpenSheet({ docIndex: idx });
   }
 };
 
@@ -763,10 +757,9 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
         
         
 
-{isMobile && fileOpenSheet && (
+{fileOpenSheet && (
   <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => setFileOpenSheet(null)}>
     <div className="w-[88%] max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-      <div className="px-6 py-5 text-center font-bold text-lg text-gray-900">파일</div>
       <div className="border-t">
         <button
           type="button"
@@ -791,7 +784,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             if (att) await downloadAttachmentToDevice(att);
           }}
         >
-          이 휴대폰에 저장
+          {isMobile ? '이 휴대폰에 저장' : '이 PC에 저장'}
         </button>
       </div>
     </div>

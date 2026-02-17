@@ -253,7 +253,7 @@ const Board: React.FC<BoardProps> = ({
     const imageAttachments = selectedPost.attachments?.filter(a => a.type.startsWith('image/')) || [];
     const docAttachments = (selectedPost.attachments || []).filter(a => !a.type.startsWith('image/'));
     const hasInlineFiles = /\[\[file:\d+\]\]/.test(selectedPost.content || '');
-    const shouldShowAttachmentBox = !isMobile || (docAttachments.length > 0 && !hasInlineFiles);
+    const shouldShowAttachmentBox = isMobile && (docAttachments.length > 0 && !hasInlineFiles);
 
 
     /**
@@ -307,7 +307,7 @@ const Board: React.FC<BoardProps> = ({
 
 
   const openMobileFileSheet = (f: { name?: string; data: string }) => {
-    if (!isMobile) return;
+    // 모바일/데스크톱 공통: 다운로드 아이콘 클릭 시 액션시트(열기/저장) 노출
     setFileActionSheet({ name: (f.name || "파일").toString(), data: f.data });
   };
 
@@ -435,8 +435,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                   className="w-11 h-11 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (isMobile) openMobileFileSheet(f);
-                    else doSaveFile(f);
+                    openMobileFileSheet(f);
                   }}
                   aria-label="다운로드"
                 >
@@ -850,7 +849,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
       </div>
 
       {/* 모바일: 파일카드 액션시트(상세 화면에서도 동작해야 함) */}
-      {isMobile && fileActionSheet && (
+      {fileActionSheet && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
           onClick={() => {
@@ -862,10 +861,6 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
             className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 pt-6 pb-4 text-center">
-              <div className="text-lg font-black text-gray-900">파일 열기</div>
-              <div className="mt-1 text-xs text-gray-400 font-bold truncate">{fileActionSheet.name}</div>
-            </div>
             <div className="border-t">
               <button
                 type="button"
@@ -887,7 +882,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                   setFileActionSheet(null);
                 }}
               >
-                이 휴대폰에 저장
+                {isMobile ? '이 휴대폰에 저장' : '이 PC에 저장'}
               </button>
             </div>
           </div>
@@ -1059,7 +1054,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
       )}
     </div>
 
-      {isMobile && fileActionSheet && (
+      {fileActionSheet && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
           onClick={() => {
@@ -1071,10 +1066,6 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
             className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 pt-6 pb-4 text-center">
-              <div className="text-lg font-black text-gray-900">파일 열기</div>
-              <div className="mt-1 text-xs text-gray-400 font-bold truncate">{fileActionSheet.name}</div>
-            </div>
             <div className="border-t">
               <button
                 type="button"
@@ -1096,7 +1087,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                   setFileActionSheet(null);
                 }}
               >
-                이 휴대폰에 저장
+                {isMobile ? '이 휴대폰에 저장' : '이 PC에 저장'}
               </button>
             </div>
           </div>
