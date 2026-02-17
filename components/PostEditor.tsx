@@ -637,6 +637,34 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     card.style.width = '100%';
     card.style.boxSizing = 'border-box';
 
+    // 삭제 버튼 (좌측 상단)
+    card.style.position = 'relative';
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.textContent = '×';
+    delBtn.setAttribute('aria-label', '삭제');
+    delBtn.style.position = 'absolute';
+    delBtn.style.left = '6px';
+    delBtn.style.top = '6px';
+    delBtn.style.width = '22px';
+    delBtn.style.height = '22px';
+    delBtn.style.borderRadius = '11px';
+    delBtn.style.border = '1px solid rgba(0,0,0,0.15)';
+    delBtn.style.background = 'rgba(255,255,255,0.95)';
+    delBtn.style.color = '#111827';
+    delBtn.style.fontSize = '18px';
+    delBtn.style.lineHeight = '18px';
+    delBtn.style.padding = '0';
+    delBtn.style.cursor = 'pointer';
+    delBtn.style.zIndex = '5';
+    delBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      removeFileByDocIndex(docIndex);
+    });
+    card.appendChild(delBtn);
+
+
     const name = document.createElement('div');
     name.setAttribute('data-file-name', '1');
     name.style.fontWeight = '700';
@@ -774,7 +802,10 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
       const nodes = Array.from(el.querySelectorAll('img[data-img-index]')) as HTMLImageElement[];
       for (const n of nodes) {
         const idx = Number(n.getAttribute('data-img-index') || '-1');
-        if (idx === imgIndex) n.remove();
+        if (idx === imgIndex) {
+        const wrap = (n.closest?.('[data-img-wrapper]') as HTMLElement | null);
+        (wrap || n).remove();
+      }
         else if (idx > imgIndex) n.setAttribute('data-img-index', String(idx - 1));
       }
       syncEditorImagesFromAttachments();
@@ -788,6 +819,40 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     const imgData = dataOverride || getImageAttachments()[imgIndex]?.data;
     if (!imgData) return;
 
+    
+    const wrapper = document.createElement('div');
+    wrapper.setAttribute('data-img-wrapper', '1');
+    wrapper.setAttribute('contenteditable', 'false');
+    wrapper.style.position = 'relative';
+    wrapper.style.width = '100%';
+    wrapper.style.margin = '10px 0';
+    wrapper.style.boxSizing = 'border-box';
+
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.textContent = '×';
+    delBtn.setAttribute('aria-label', '삭제');
+    delBtn.style.position = 'absolute';
+    delBtn.style.left = '6px';
+    delBtn.style.top = '6px';
+    delBtn.style.width = '24px';
+    delBtn.style.height = '24px';
+    delBtn.style.borderRadius = '12px';
+    delBtn.style.border = '1px solid rgba(0,0,0,0.15)';
+    delBtn.style.background = 'rgba(255,255,255,0.95)';
+    delBtn.style.color = '#111827';
+    delBtn.style.fontSize = '18px';
+    delBtn.style.lineHeight = '20px';
+    delBtn.style.padding = '0';
+    delBtn.style.cursor = 'pointer';
+    delBtn.style.zIndex = '5';
+
+    delBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      removeImageByImgIndex(imgIndex);
+    });
+
     const img = document.createElement('img');
     img.src = imgData;
     img.setAttribute('data-attach-kind', 'img');
@@ -795,7 +860,6 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     img.setAttribute('draggable', 'true');
     img.style.maxWidth = '100%';
     img.style.borderRadius = '10px';
-    img.style.margin = '10px 0';
     img.style.display = 'block';
 
     img.addEventListener('dragstart', (e) => {
@@ -805,6 +869,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     });
     img.addEventListener('dragend', () => img.classList.remove('opacity-60'));
 
+    // (기존 동작 유지) 데스크톱: 이미지 클릭 시 삭제 확인
     img.addEventListener('click', () => {
       if (isMobile) return;
       if (confirm('이 이미지를 삭제할까요?')) {
@@ -812,15 +877,18 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
       }
     });
 
+    wrapper.appendChild(img);
+    wrapper.appendChild(delBtn);
+
     const sel = window.getSelection?.();
     if (sel && sel.rangeCount > 0) {
       const range = sel.getRangeAt(0);
       if (!el.contains(range.startContainer)) {
-        el.appendChild(img);
+        el.appendChild(wrapper);
         el.appendChild(document.createElement('br'));
       } else {
         range.deleteContents();
-        range.insertNode(img);
+        range.insertNode(wrapper);
         range.collapse(false);
         range.insertNode(document.createElement('br'));
         range.collapse(false);
@@ -828,7 +896,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
         sel.addRange(range);
       }
     } else {
-      el.appendChild(img);
+      el.appendChild(wrapper);
       el.appendChild(document.createElement('br'));
     }
     setContent(serializeEditorToContent());

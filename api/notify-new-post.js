@@ -89,6 +89,7 @@ export default async function handler(req, res) {
       (board === "notice_all" ? "공고/공지에 새 글이 등록되었습니다."
         : board === "family_events" ? "경조사 게시판에 새 글이 등록되었습니다."
         : board === "resources" ? "자료실에 새 자료가 업로드되었습니다."
+        : board === "dispatch" ? "배차표에 새 글이 등록되었습니다."
         : "자유게시판에 새 글이 등록되었습니다.");
 
     const url = postId ? `/#tab=${encodeURIComponent(board)}&id=${encodeURIComponent(String(postId))}`
