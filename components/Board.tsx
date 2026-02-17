@@ -270,7 +270,9 @@ const Board: React.FC<BoardProps> = ({
     type === 'free' ||
     type === 'resources' ||
     type === 'notice_all' ||
-    type === 'family_events';
+    type === 'family_events' ||
+    // 배차표(진관/도봉/송파) 게시판은 모바일에서만 목록 높이를 줄여 카드가 과도하게 커 보이지 않도록 함
+    (isMobile && typeof type === 'string' && type.startsWith('dispatch_'));
 
   // 상세 보기 모드
   if (selectedPost) {
