@@ -55,6 +55,10 @@ const Board: React.FC<BoardProps> = ({
   const [fileActionSheet, setFileActionSheet] = useState<{ name: string; data: string } | null>(null);
   const [fileActionBusy, setFileActionBusy] = useState(false);
 
+  // 이미지 카드: 열기/저장 액션시트(모바일/데스크톱 공통)
+  const [imageActionSheet, setImageActionSheet] = useState<{ name: string; data: string } | null>(null);
+  const [imageActionBusy, setImageActionBusy] = useState(false);
+
   // 페이징
   const [page, setPage] = useState(1);
   const [noticeAllPage, setNoticeAllPage] = useState(1);
@@ -311,6 +315,10 @@ const Board: React.FC<BoardProps> = ({
     setFileActionSheet({ name: (f.name || "파일").toString(), data: f.data });
   };
 
+  const openImageSheet = (img: { name?: string; data: string }) => {
+    setImageActionSheet({ name: (img.name || 'image').toString(), data: img.data });
+  };
+
   const doOpenFile = async (f: { name?: string; data: string }) => {
     try {
       // 모바일은 data: URL 그대로 여는 게 앱 선택(뷰어 선택) UX가 더 잘 먹힘
@@ -363,6 +371,55 @@ const Board: React.FC<BoardProps> = ({
     }
   };
 
+  const doOpenImage = async (img: { name?: string; data: string }) => {
+    try {
+      if (isMobile) {
+        const a = document.createElement('a');
+        a.href = img.data;
+        a.target = '_blank';
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        return;
+      }
+
+      setImageActionBusy(true);
+      const res = await fetch(img.data);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch (e) {
+      console.error('이미지 열기 실패:', e);
+      alert('이미지를 열 수 없습니다.');
+    } finally {
+      setImageActionBusy(false);
+    }
+  };
+
+  const doSaveImage = async (img: { name?: string; data: string }) => {
+    try {
+      setImageActionBusy(true);
+      const res = await fetch(img.data);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (img.name || 'image').toString();
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) {
+      console.error('이미지 저장 실패:', e);
+      alert('저장에 실패했습니다.');
+    } finally {
+      setImageActionBusy(false);
+    }
+  };
+
 const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[]; used: Set<number> } => {
   // Supabase/레거시 데이터에서 content가 null/undefined로 들어올 수 있어 안전 처리
   const safeRaw =
@@ -403,15 +460,15 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                 key={`img-${i}`}
                 className="my-4 w-[calc(100%+2rem)] -mx-4 overflow-hidden rounded-2xl border border-gray-100 bg-white md:w-[calc(100%+3rem)] md:-mx-6"
                 onContextMenu={(e) => {
+                  // 모바일에선 길게 눌러 기본 메뉴 대신 액션시트
                   if (!isMobile) return;
                   e.preventDefault();
-                  const ok = confirm('이미지를 새 창에서 열까요? (길게 눌러 저장도 가능)');
-                  if (ok) window.open(imageAttachments[idx].data, '_blank');
+                  const att = imageAttachments[idx];
+                  openImageSheet({ name: att.name || `image-${idx + 1}.jpg`, data: att.data });
                 }}
                 onClick={() => {
-                  if (!isMobile) return;
-                  const ok = confirm('이미지를 새 창에서 열까요? (길게 눌러 저장도 가능)');
-                  if (ok) window.open(imageAttachments[idx].data, '_blank');
+                  const att = imageAttachments[idx];
+                  openImageSheet({ name: att.name || `image-${idx + 1}.jpg`, data: att.data });
                 }}
               >
                 <img
@@ -895,6 +952,47 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                 onClick={async () => {
                   await doSaveFile(fileActionSheet);
                   setFileActionSheet(null);
+                }}
+              >
+                {isMobile ? '이 휴대폰에 저장' : '이 PC에 저장'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 이미지카드 액션시트 */}
+      {imageActionSheet && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
+          onClick={() => {
+            if (imageActionBusy) return;
+            setImageActionSheet(null);
+          }}
+        >
+          <div
+            className="w-[92vw] max-w-sm rounded-2xl bg-white shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="divide-y">
+              <button
+                type="button"
+                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50"
+                disabled={imageActionBusy}
+                onClick={() => {
+                  doOpenImage(imageActionSheet);
+                  setImageActionSheet(null);
+                }}
+              >
+                이미지 열기
+              </button>
+              <button
+                type="button"
+                className="w-full px-6 py-4 text-base font-black text-gray-900 hover:bg-gray-50"
+                disabled={imageActionBusy}
+                onClick={async () => {
+                  await doSaveImage(imageActionSheet);
+                  setImageActionSheet(null);
                 }}
               >
                 {isMobile ? '이 휴대폰에 저장' : '이 PC에 저장'}

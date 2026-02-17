@@ -18,6 +18,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const longPressTimerRef = useRef<number | null>(null);
   const [actionSheet, setActionSheet] = useState<{ kind: 'img' | 'file'; index: number } | null>(null);
   const [fileOpenSheet, setFileOpenSheet] = useState<{ docIndex: number } | null>(null);
+  const [imageOpenSheet, setImageOpenSheet] = useState<{ imgIndex: number } | null>(null);
 
 
   const openActionSheetFromTarget = (target: HTMLElement | null) => {
@@ -98,6 +99,18 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
 const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
   const target = e.target as HTMLElement | null;
   if (!target) return;
+
+  // image click inside editor -> open/save sheet
+  const img = target.closest('img[data-img-index]') as HTMLElement | null;
+  if (img) {
+    const idx = Number(img.getAttribute('data-img-index') || '-1');
+    if (!Number.isFinite(idx) || idx < 0) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    setImageOpenSheet({ imgIndex: idx });
+    return;
+  }
 
   // download icon click inside file card
   const dl = target.closest('[data-file-dl]') as HTMLElement | null;
@@ -781,6 +794,40 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             const docs = getDocAttachments();
             const att = docs[fileOpenSheet.docIndex];
             setFileOpenSheet(null);
+            if (att) await downloadAttachmentToDevice(att);
+          }}
+        >
+          {isMobile ? '이 휴대폰에 저장' : '이 PC에 저장'}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{imageOpenSheet && (
+  <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => setImageOpenSheet(null)}>
+    <div className="w-[88%] max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="border-t">
+        <button
+          type="button"
+          className="w-full py-5 text-center text-base font-medium active:bg-gray-50"
+          onClick={async () => {
+            const imgs = getImageAttachments();
+            const att = imgs[imageOpenSheet.imgIndex];
+            setImageOpenSheet(null);
+            if (att) await openAttachmentInNewTab(att);
+          }}
+        >
+          이미지 열기
+        </button>
+        <div className="h-px bg-gray-200" />
+        <button
+          type="button"
+          className="w-full py-5 text-center text-base font-medium active:bg-gray-50"
+          onClick={async () => {
+            const imgs = getImageAttachments();
+            const att = imgs[imageOpenSheet.imgIndex];
+            setImageOpenSheet(null);
             if (att) await downloadAttachmentToDevice(att);
           }}
         >
