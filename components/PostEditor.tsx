@@ -16,61 +16,136 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const longPressTimerRef = useRef<number | null>(null);
-  const [actionSheet, setActionSheet] = useState<{ kind: 'img' | 'file'; index: number } | null>(null);
   const [fileOpenSheet, setFileOpenSheet] = useState<{ docIndex: number } | null>(null);
   const [imageOpenSheet, setImageOpenSheet] = useState<{ imgIndex: number } | null>(null);
   const [imageViewerUrl, setImageViewerUrl] = useState<string | null>(null);
 
+  // --- Mobile reorder (long-press + drag) ---
+  const dragRef = useRef<{ active: boolean; node: HTMLElement | null; placeholder: HTMLElement | null; touchId: number | null; startY: number; offsetY: number; }>({ active: false, node: null, placeholder: null, touchId: null, startY: 0, offsetY: 0 });
 
+  const cleanupDrag = () => {
+    const st = dragRef.current;
+    if (!st.active) return;
+    st.active = false;
+    try {
+      window.removeEventListener('touchmove', onWindowTouchMove as any);
+      window.removeEventListener('touchend', onWindowTouchEnd as any);
+      window.removeEventListener('touchcancel', onWindowTouchEnd as any);
+    } catch {}
 
-  const openActionSheetFromTarget = (target: HTMLElement | null) => {
-    if (!target) return;
-    const img = target.closest('img[data-img-index]') as HTMLElement | null;
-    if (img) {
-      const idx = Number(img.getAttribute('data-img-index') || '-1');
-      if (Number.isFinite(idx) && idx >= 0) setActionSheet({ kind: 'img', index: idx });
-      return;
+    // restore body scroll
+    document.body.style.overflow = '';
+
+    const node = st.node;
+    const ph = st.placeholder;
+    if (node) {
+      node.classList.remove('ring-2', 'ring-sky-400');
+      node.style.position = '';
+      node.style.left = '';
+      node.style.top = '';
+      node.style.width = '';
+      node.style.zIndex = '';
+      node.style.transform = '';
+      node.style.pointerEvents = '';
     }
-    const file = target.closest('[data-file-index]') as HTMLElement | null;
-    if (file) {
-      const idx = Number(file.getAttribute('data-file-index') || '-1');
-      if (Number.isFinite(idx) && idx >= 0) setActionSheet({ kind: 'file', index: idx });
+    if (node && ph && ph.parentNode) {
+      ph.parentNode.insertBefore(node, ph);
+      ph.remove();
+    } else if (ph) {
+      ph.remove();
     }
-  };
 
-  const moveAttachmentInEditor = (direction: 'up' | 'down') => {
-    const el = editorRef.current;
-    if (!el || !actionSheet) return;
+    st.node = null;
+    st.placeholder = null;
+    st.touchId = null;
 
-    const selector = actionSheet.kind === 'img'
-      ? `img[data-img-index="${actionSheet.index}"]`
-      : `[data-file-index="${actionSheet.index}"]`;
-
-    const node = el.querySelector(selector) as HTMLElement | null;
-    if (!node) return;
-
-    const items = Array.from(el.querySelectorAll('img[data-img-index], [data-file-index]')) as HTMLElement[];
-    const cur = items.indexOf(node);
-    if (cur === -1) return;
-
-    const nextIndex = direction === 'up' ? cur - 1 : cur + 1;
-    const neighbor = items[nextIndex];
-    if (!neighbor) return;
-
-    if (direction === 'up') {
-      neighbor.parentNode?.insertBefore(node, neighbor);
-    } else {
-      // insert after neighbor
-      neighbor.parentNode?.insertBefore(node, neighbor.nextSibling);
-    }
+    // persist new order in editor content
     setContent(serializeEditorToContent());
   };
 
-  const deleteAttachmentInEditor = () => {
-    if (!actionSheet) return;
-    if (actionSheet.kind === 'img') removeImageByImgIndex(actionSheet.index);
-    else removeFileByDocIndex(actionSheet.index);
-    setActionSheet(null);
+  const getTouchById = (e: TouchEvent, id: number | null) => {
+    if (id == null) return e.touches[0] || e.changedTouches[0] || null;
+    for (const t of Array.from(e.touches)) if (t.identifier === id) return t;
+    for (const t of Array.from(e.changedTouches)) if (t.identifier === id) return t;
+    return null;
+  };
+
+  const onWindowTouchMove = (e: TouchEvent) => {
+    const st = dragRef.current;
+    if (!st.active || !st.node) return;
+    const t = getTouchById(e, st.touchId);
+    if (!t) return;
+    e.preventDefault();
+
+    const y = t.clientY;
+    const x = t.clientX;
+
+    // move dragged node
+    const top = y - st.offsetY;
+    st.node.style.top = `${top}px`;
+
+    // find target element under finger
+    const elUnder = document.elementFromPoint(x, y) as HTMLElement | null;
+    const target = elUnder?.closest('img[data-img-index], [data-file-index]') as HTMLElement | null;
+    if (!target) return;
+    if (target === st.node) return;
+
+    const ph = st.placeholder;
+    if (!ph || !target.parentNode) return;
+
+    const rect = target.getBoundingClientRect();
+    const before = y < rect.top + rect.height / 2;
+    if (before) {
+      target.parentNode.insertBefore(ph, target);
+    } else {
+      target.parentNode.insertBefore(ph, target.nextSibling);
+    }
+  };
+
+  const onWindowTouchEnd = (_e: TouchEvent) => {
+    cleanupDrag();
+  };
+
+  const startDragFromTarget = (target: HTMLElement, touch: React.Touch) => {
+    const node = target.closest('img[data-img-index], [data-file-index]') as HTMLElement | null;
+    const editor = editorRef.current;
+    if (!node || !editor) return;
+
+    // create placeholder with same size
+    const r = node.getBoundingClientRect();
+    const ph = document.createElement('div');
+    ph.style.height = `${r.height}px`;
+    ph.style.margin = '6px 0';
+    ph.style.borderRadius = '12px';
+    ph.style.border = '2px dashed rgba(148,163,184,0.8)';
+    ph.style.background = 'rgba(148,163,184,0.08)';
+
+    node.parentNode?.insertBefore(ph, node);
+
+    // lift node
+    node.classList.add('ring-2', 'ring-sky-400');
+    node.style.position = 'fixed';
+    node.style.left = `${r.left}px`;
+    node.style.top = `${r.top}px`;
+    node.style.width = `${r.width}px`;
+    node.style.zIndex = '9999';
+    node.style.transform = 'scale(1.02)';
+    node.style.pointerEvents = 'none';
+
+    // disable page scroll while dragging (stability first)
+    document.body.style.overflow = 'hidden';
+
+    const st = dragRef.current;
+    st.active = true;
+    st.node = node;
+    st.placeholder = ph;
+    st.touchId = touch.identifier;
+    st.startY = touch.clientY;
+    st.offsetY = touch.clientY - r.top;
+
+    window.addEventListener('touchmove', onWindowTouchMove as any, { passive: false });
+    window.addEventListener('touchend', onWindowTouchEnd as any);
+    window.addEventListener('touchcancel', onWindowTouchEnd as any);
   };
 
   const handleEditorTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -79,25 +154,43 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     // 첨부 요소에서만 롱프레스 동작
     if (!target?.closest('img[data-img-index], [data-file-index]')) return;
 
+    // 이미 드래그 중이면 무시
+    if (dragRef.current.active) return;
+
+    const t = e.touches[0];
+    if (!t) return;
+
     if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+
+    const startX = t.clientX;
+    const startY = t.clientY;
+
     longPressTimerRef.current = window.setTimeout(() => {
-      openActionSheetFromTarget(target);
-    }, 450);
+      // 롱프레스 후 드래그 시작
+      startDragFromTarget(target, t);
+    }, 400);
+
+    // 롱프레스 전에 손가락이 움직이면(스크롤/탭) 타이머 취소
+    const cancelOnMove = (ev: TouchEvent) => {
+      const st = ev.touches[0];
+      if (!st) return;
+      const dx = Math.abs(st.clientX - startX);
+      const dy = Math.abs(st.clientY - startY);
+      if (dx + dy > 10) {
+        if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
+        longPressTimerRef.current = null;
+        window.removeEventListener('touchmove', cancelOnMove as any);
+      }
+    };
+    window.addEventListener('touchmove', cancelOnMove as any, { passive: true });
   };
 
   const handleEditorTouchEnd = () => {
     if (longPressTimerRef.current) window.clearTimeout(longPressTimerRef.current);
     longPressTimerRef.current = null;
+    // 손을 떼면 드래그 종료
+    if (dragRef.current.active) cleanupDrag();
   };
-
-  const handleEditorContextMenu = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isMobile) return;
-    const target = e.target as HTMLElement | null;
-    if (!target?.closest('img[data-img-index], [data-file-index]')) return;
-    e.preventDefault();
-    openActionSheetFromTarget(target);
-  };
-
 const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
   const target = e.target as HTMLElement | null;
   if (!target) return;
@@ -757,7 +850,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
         {isMobile && (
           <div className="mb-3 text-xs text-gray-500">
             첨부: 사진 {attachments.filter(a => a.type?.startsWith('image/')).length}/{MAX_IMAGE_FILES} · 문서 {attachments.filter(a => !a.type?.startsWith('image/')).length}/{MAX_DOC_FILES}
-            <span className="ml-2 text-gray-400">(본문에서 길게 눌러 이동/삭제)</span>
+            <span className="ml-2 text-gray-400">(본문에서 길게 눌러 드래그로 순서 변경)</span>
           </div>
         )}
 
@@ -786,7 +879,6 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                 onTouchStart={handleEditorTouchStart}
                 onTouchEnd={handleEditorTouchEnd}
                 onTouchCancel={handleEditorTouchEnd}
-                onContextMenu={handleEditorContextMenu}
                 className="w-full min-h-[260px] p-4 border rounded-lg bg-white focus:outline-none"
                 style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}
               />
@@ -892,44 +984,6 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
   </div>
 )}
 
-{isMobile && actionSheet && (
-          <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/40">
-            <div className="w-full max-w-md rounded-t-3xl bg-white p-4 shadow-2xl">
-              <div className="text-sm font-bold text-gray-800 mb-2">첨부 항목</div>
-              <div className="text-xs text-gray-500 mb-4">길게 눌러 위치 이동 / 삭제</div>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  className="py-3 rounded-xl border font-bold text-sm"
-                  onClick={() => moveAttachmentInEditor('up')}
-                >
-                  위로
-                </button>
-                <button
-                  type="button"
-                  className="py-3 rounded-xl border font-bold text-sm"
-                  onClick={() => moveAttachmentInEditor('down')}
-                >
-                  아래로
-                </button>
-                <button
-                  type="button"
-                  className="py-3 rounded-xl border font-bold text-sm text-red-600"
-                  onClick={deleteAttachmentInEditor}
-                >
-                  삭제
-                </button>
-              </div>
-              <button
-                type="button"
-                className="mt-3 w-full py-3 rounded-xl bg-gray-100 font-bold text-sm"
-                onClick={() => setActionSheet(null)}
-              >
-                닫기
-              </button>
-            </div>
-          </div>
-        )}
 
 <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
