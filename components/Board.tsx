@@ -575,6 +575,10 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                   <div
                     key={idx}
                     className="bg-white p-4 rounded-2xl border flex flex-col gap-3 shadow-sm hover:border-sky-primary transition-all group sm:flex-row sm:items-center sm:justify-between"
+                    onClick={() => {
+                      if (!isMobile) return;
+                      openMobileFileSheet(file);
+                    }}
                   >
                     {/* 파일명 (모바일: 2줄까지 최대한 보여주기 / 데스크톱: 한 줄 말줄임) */}
                     <div className="flex items-start sm:items-center sm:min-w-0">
@@ -583,14 +587,24 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                       </span>
                     </div>
 
-                    {/* 다운로드 버튼 (모바일: 아래로 분리 / 텍스트 줄바꿈 방지) */}
-                    <a
-                      href={file.data}
-                      download={file.name}
-                      className="inline-flex w-fit items-center justify-center px-3 py-1.5 bg-sky-primary text-white text-[11px] font-black rounded-lg shadow-sm hover:opacity-90 active:scale-95 transition-all whitespace-nowrap"
+                    {/* 다운로드 버튼 */}
+                    <button
+                      type="button"
+                      className="w-11 h-11 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center self-end sm:self-auto"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isMobile) openMobileFileSheet(file);
+                        else doSaveFile(file);
+                      }}
+                      aria-label="다운로드"
                     >
-                      다운로드
-                    </a>
+                      {/* tray download icon */}
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3v10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        <path d="M8 11l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M4 17v3h16v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>
