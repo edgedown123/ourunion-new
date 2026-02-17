@@ -1066,7 +1066,27 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
           />
         </div>
 
-        <div className="bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-200">
+        {/*
+          ✅ 첨부 UI
+          - 기존: 파일 선택 버튼이 모바일에서만 노출되어 데스크톱에서는 "글 수정" 화면에서 첨부를 추가할 수 없었음
+          - 개선: 데스크톱에서도 파일 선택 버튼을 제공 + (데스크톱) 박스 클릭/Enter/Space로 파일 선택 가능
+        */}
+        <div
+          className="bg-gray-50 p-4 rounded-xl border-2 border-dashed border-gray-200"
+          onClick={(e) => {
+            // 데스크톱: 박스 "빈 공간" 클릭 시에만 파일 선택 열기 (내부 버튼/카드 클릭은 제외)
+            if (!isMobile && e.target === e.currentTarget) {
+              fileInputRef.current?.click?.();
+            }
+          }}
+          role={!isMobile ? 'button' : undefined}
+          tabIndex={!isMobile ? 0 : undefined}
+          onKeyDown={(e) => {
+            if (!isMobile && (e.key === 'Enter' || e.key === ' ')) {
+              fileInputRef.current?.click?.();
+            }
+          }}
+        >
           {!isMobile && (
             <label className="block text-sm font-bold text-gray-700 mb-2">
               <i className="fas fa-paperclip mr-2"></i> 첨부파일 (사진 최대 5개 / 문서 최대 3개 / 총 8개)
@@ -1097,7 +1117,13 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                     <p className="text-gray-400">{(file.data.length * 0.75 / 1024).toFixed(1)} KB {file.type?.startsWith('image/') && <span className="text-emerald-500 font-bold ml-1">(최적화됨)</span>}</p>
                   </div>
                 </div>
-                <button onClick={() => removeAttachment(idx)} className="text-red-400 hover:text-red-600">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeAttachment(idx);
+                  }}
+                  className="text-red-400 hover:text-red-600"
+                >
                   <i className="fas fa-times"></i>
                 </button>
               </div>
@@ -1119,16 +1145,19 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
           </div>
         )}
 
-        {isMobile && (
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click?.()}
-            className="w-full py-3 rounded-xl bg-white border font-bold text-gray-700 flex items-center justify-center gap-2"
-          >
-            <i className="fas fa-paperclip"></i>
-            파일/사진 첨부하기
-          </button>
-        )}
+        {/* 모바일/데스크톱 모두 파일 선택 버튼 제공 */}
+        <button
+          type="button"
+          onClick={(e) => {
+            // 상위 컨테이너 onClick(데스크톱)과 중복 클릭 방지
+            e.stopPropagation();
+            fileInputRef.current?.click?.();
+          }}
+          className="w-full py-3 rounded-xl bg-white border font-bold text-gray-700 flex items-center justify-center gap-2"
+        >
+          <i className="fas fa-paperclip"></i>
+          파일/사진 첨부하기
+        </button>
 </div>
 
         <div>
