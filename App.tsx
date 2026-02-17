@@ -9,6 +9,7 @@ import PushOnboardingCard from './components/PushOnboardingCard';
 import Board from './components/Board';
 import NoticeLanding from './components/NoticeLanding';
 import NoticeSingle from './components/NoticeSingle';
+import { DispatchLanding, DispatchSheetView } from './components/DispatchSheet';
 import AdminPanel from './components/AdminPanel';
 import PostEditor from './components/PostEditor';
 import Introduction from './components/Introduction';
@@ -498,7 +499,17 @@ const invalidateMembersCache = () => {
     if (isDesktop && nextTab === 'notice') nextTab = 'notice_all';
     // 제한된 메뉴(게스트): 공지사항(공고/공지, 경조사 포함), 자유게시판, 자료실
     // - 모바일: notice(랜드)도 차단
-    const restrictedTabs = ['notice', 'notice_all', 'family_events', 'free', 'resources'];
+    const restrictedTabs = [
+      'notice',
+      'notice_all',
+      'family_events',
+      'dispatch',
+      'dispatch_jinkwan',
+      'dispatch_dobong',
+      'dispatch_songpa',
+      'free',
+      'resources',
+    ];
     
     if (userRole === 'guest' && restrictedTabs.includes(nextTab)) {
       setShowApprovalPending(true);
@@ -1313,6 +1324,17 @@ await cloud.deleteMemberFromCloud(user.id);
               />
             </div>
           </>
+        ) : activeTab === 'dispatch' ? (
+          <DispatchLanding onSelect={handleTabChange} />
+        ) : ['dispatch_jinkwan', 'dispatch_dobong', 'dispatch_songpa'].includes(activeTab) ? (
+          <DispatchSheetView
+            area={(activeTab === 'dispatch_jinkwan'
+              ? 'jinkwan'
+              : activeTab === 'dispatch_dobong'
+                ? 'dobong'
+                : 'songpa')}
+            settings={settings}
+          />
         ) : (
           <div className="relative">
             <Board 

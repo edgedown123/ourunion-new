@@ -32,6 +32,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const greetingImageRef = useRef<HTMLInputElement>(null);
   const officeMapInputRef = useRef<HTMLInputElement>(null);
   const importFileInputRef = useRef<HTMLInputElement>(null);
+  const dispatchRefs = {
+    jinkwan: useRef<HTMLInputElement>(null),
+    dobong: useRef<HTMLInputElement>(null),
+    songpa: useRef<HTMLInputElement>(null),
+  };
   
   const [adminTab, setAdminTab] = useState<'members' | 'intro' | 'offices' | 'posts' | 'storage' | 'push' | 'settings'>('members');
   const [openMemberActionId, setOpenMemberActionId] = useState<string | null>(null);
@@ -271,6 +276,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleDispatchUpload = (e: React.ChangeEvent<HTMLInputElement>, area: 'jinkwan' | 'dobong' | 'songpa') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const next = {
+        ...(settings.dispatchSheets || {}),
+        [area]: reader.result as string,
+      };
+      setSettings({ ...settings, dispatchSheets: next });
+    };
+    reader.readAsDataURL(file);
   };
 
   
@@ -1210,6 +1229,70 @@ const handleAddHistory = () => {
                     <div><label className="block text-[10px] font-black text-gray-400 mb-2 tracking-widest uppercase">보조 슬로건</label><input type="text" name="heroSubtitle" value={settings.heroSubtitle} onChange={handleSettingsChange} className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm text-gray-500 outline-none focus:border-sky-primary" /></div>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* 배차표 관리 */}
+            <div className="bg-white p-10 rounded-[2.5rem] border shadow-sm space-y-8">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-gray-900 text-lg flex items-center whitespace-nowrap">
+                  <i className="fas fa-bus mr-3 text-sky-primary"></i> 배차표 이미지 관리
+                </h3>
+                <span className="text-[11px] text-gray-400 font-bold">진관 · 도봉 · 송파</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {([
+                  { key: 'jinkwan', label: '진관' },
+                  { key: 'dobong', label: '도봉' },
+                  { key: 'songpa', label: '송파' },
+                ] as const).map((it) => {
+                  const src = settings.dispatchSheets?.[it.key] || '';
+                  const ref = dispatchRefs[it.key];
+                  return (
+                    <div key={it.key} className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[10px] font-black text-gray-400 tracking-widest uppercase">{it.label}</label>
+                        {src && (
+                          <button
+                            onClick={() => setSettings({ ...settings, dispatchSheets: { ...(settings.dispatchSheets || {}), [it.key]: '' } })}
+                            className="text-red-400 hover:text-red-600 transition-colors"
+                            title="삭제"
+                          >
+                            <i className="fas fa-times-circle text-xs"></i>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="aspect-[4/3] bg-gray-50 rounded-[1.5rem] overflow-hidden border-2 border-white shadow-md relative group">
+                        {src ? (
+                          <img src={src} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex flex-col items-center justify-center text-gray-300">
+                            <i className="fas fa-image text-2xl mb-2" />
+                            <div className="text-xs font-black">이미지 없음</div>
+                          </div>
+                        )}
+
+                        <button
+                          onClick={() => ref.current?.click()}
+                          className="absolute inset-0 bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center font-black"
+                        >
+                          <i className="fas fa-camera text-xl mb-1"></i>
+                          {src ? '변경' : '추가'}
+                        </button>
+                        <input
+                          type="file"
+                          ref={ref}
+                          className="hidden"
+                          accept="image/*"
+                          onChange={(e) => handleDispatchUpload(e, it.key)}
+                        />
+                      </div>
+                      <div className="text-[11px] text-gray-400 font-bold">업로드하면 즉시 저장됩니다.</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

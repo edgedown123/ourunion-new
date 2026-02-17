@@ -43,6 +43,7 @@ const Navbar: React.FC<NavbarProps> = ({ siteName, activeTab, onTabChange, userR
   const mobileGroups = useMemo(() => {
     const intro = NAV_ITEMS.find(i => i.id === 'intro');
     const notice = NAV_ITEMS.find(i => i.id === 'notice');
+    const dispatch = NAV_ITEMS.find(i => i.id === 'dispatch');
     return [
       {
         id: 'intro',
@@ -59,6 +60,15 @@ const Navbar: React.FC<NavbarProps> = ({ siteName, activeTab, onTabChange, userR
         children: notice?.children || [
           { id: 'notice_all', label: '공고/공지' },
           { id: 'family_events', label: '경조사' },
+        ]
+      },
+      {
+        id: 'dispatch',
+        label: '배차표',
+        children: dispatch?.children || [
+          { id: 'dispatch_jinkwan', label: '진관' },
+          { id: 'dispatch_dobong', label: '도봉' },
+          { id: 'dispatch_songpa', label: '송파' },
         ]
       },
       { id: 'free', label: '자유게시판' },

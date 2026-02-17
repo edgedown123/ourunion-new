@@ -49,7 +49,12 @@ export const INITIAL_SETTINGS: SiteSettings = {
       phone: '02-555-5555',
       mapImageUrl: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&q=80&w=1200'
     }
-  ]
+  ],
+  dispatchSheets: {
+    jinkwan: '',
+    dobong: '',
+    songpa: '',
+  }
 };
 
 export const INITIAL_POSTS: Post[] = [
@@ -93,6 +98,18 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { id: 'notice_all', label: '공고/공지' },
       { id: 'family_events', label: '경조사' },
+    ]
+  },
+
+  // ✅ 배차표(진관/도봉/송파)
+  {
+    id: 'dispatch',
+    label: '배차표',
+    icon: 'fa-bus',
+    children: [
+      { id: 'dispatch_jinkwan', label: '진관' },
+      { id: 'dispatch_dobong', label: '도봉' },
+      { id: 'dispatch_songpa', label: '송파' },
     ]
   },
 
