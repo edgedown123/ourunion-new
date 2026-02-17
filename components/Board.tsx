@@ -930,6 +930,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
   };
 
   return (
+    <>
     <div className="max-w-7xl mx-auto py-10 px-5 animate-fadeIn">
       <div className="flex justify-between items-center mb-12">
         <div>
@@ -996,6 +997,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
         </div>
       )}
     </div>
+
       {isMobile && fileActionSheet && (
         <div
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40"
@@ -1040,6 +1042,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
         </div>
       )}
 
+    </>
   );
 };
 
