@@ -9,6 +9,7 @@ const OBITUARY_TAG_END = '[[/obituary]]';
 type ObituaryFormData = {
   kind: 'obituary';
   deceasedName: string;
+  memberName?: string;
   relation?: string;
   bereaved?: string;
   deathDate?: string;
@@ -56,6 +57,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [obituary, setObituary] = useState<ObituaryFormData>({
     kind: 'obituary',
     deceasedName: '',
+    memberName: '',
     relation: '',
     bereaved: '',
     deathDate: '',
@@ -1272,12 +1274,12 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">표기(선택)</label>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">조합원 성함</label>
                     <input
                       className="w-full rounded-2xl border p-3"
-                      value={obituary.relation || ''}
-                      onChange={(e) => setObituary((p) => ({ ...p, relation: e.target.value }))}
-                      placeholder="예) 님 / 조합원 / (故)"
+                      value={(obituary.memberName || obituary.relation) || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, memberName: e.target.value, relation: e.target.value }))}
+                      placeholder="예) 000조합원 부친상, 000조합원 모친상"
                     />
                   </div>
 
@@ -1512,7 +1514,12 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                 alert('고인 성함을 입력해주세요.');
                 return;
               }
-              const genTitle = `부고 | ${obituary.deceasedName}${obituary.relation ? ` ${obituary.relation}` : ''}`.trim();
+              if (!(obituary.memberName || obituary.relation || '').trim()) {
+                alert('조합원 성함(예: 000조합원 부친상/모친상)을 입력해주세요.');
+                return;
+              }
+              const memberTitle = ((obituary.memberName || obituary.relation) || '').trim();
+              const genTitle = `부고 | ${memberTitle}`.trim();
               const genContent = buildObituaryContent({ ...obituary, kind: 'obituary' });
               onSave(genTitle, genContent, attachments, initialPost?.id);
               return;

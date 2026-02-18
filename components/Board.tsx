@@ -7,6 +7,7 @@ const OBITUARY_TAG_END = '[[/obituary]]';
 type ObituaryFormData = {
   kind: 'obituary';
   deceasedName: string;
+  memberName?: string;
   relation?: string;
   bereaved?: string;
   deathDate?: string;
@@ -699,8 +700,11 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                     <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
                     <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>
                     <div className="mt-5 text-xl sm:text-2xl font-extrabold text-gray-900">
-                      {obituaryData.deceasedName}{obituaryData.relation ? ` ${obituaryData.relation}` : ''}
+                      {obituaryData.deceasedName}
                     </div>
+                    {(obituaryData.memberName || obituaryData.relation) ? (
+                      <div className="mt-1 text-sm text-gray-600 font-semibold">{(obituaryData.memberName || obituaryData.relation)}</div>
+                    ) : null}
                     <p className="mt-2 text-gray-700">삼가 고인의 명복을 빕니다.</p>
                   </div>
 
