@@ -1,5 +1,38 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+
+const OBITUARY_TAG_START = '[[obituary]]';
+const OBITUARY_TAG_END = '[[/obituary]]';
+
+type ObituaryFormData = {
+  kind: 'obituary';
+  deceasedName: string;
+  relation?: string;
+  bereaved?: string;
+  deathDate?: string;
+  funeralDate?: string;
+  burialPlace?: string;
+  hallName?: string;
+  hallRoom?: string;
+  hallAddress?: string;
+  contact?: string;
+  account?: string;
+  notice?: string;
+};
+
+const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
+  if (!content) return null;
+  const s = content.indexOf(OBITUARY_TAG_START);
+  const e = content.indexOf(OBITUARY_TAG_END);
+  if (s === -1 || e === -1 || e <= s) return null;
+  const jsonText = content.slice(s + OBITUARY_TAG_START.length, e).trim();
+  try {
+    const obj = JSON.parse(jsonText);
+    if (obj?.kind === 'obituary') return obj as ObituaryFormData;
+  } catch {}
+  return null;
+};
+
 import { Post, BoardType, UserRole, Comment } from '../types';
 import { NAV_ITEMS } from '../constants';
 
@@ -582,6 +615,8 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
 };
 
     const rendered = renderContentWithInlineImages(selectedPost.content);
+    const obituaryData = (selectedPost.type === 'family_events') ? tryParseObituaryContent(selectedPost.content || '') : null;
+
     const isNoticeCategory = selectedPost.type === 'notice_all' || selectedPost.type === 'family_events';
 
     return (
@@ -650,7 +685,81 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
           </header>
 
           <div className="prose prose-sky max-w-none text-gray-700 leading-relaxed min-h-[120px] md:min-h-[200px] text-base md:text-lg prose-p:my-3">
-            {rendered.nodes}
+            {obituaryData ? (
+              <div
+                className="rounded-3xl overflow-hidden border shadow-sm"
+                style={{
+                  backgroundImage: 'url(/images/obituary-bg.svg)',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                <div className="bg-white/85 backdrop-blur-[1px] p-6 sm:p-10">
+                  <div className="text-center">
+                    <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
+                    <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>
+                    <div className="mt-5 text-xl sm:text-2xl font-extrabold text-gray-900">
+                      {obituaryData.deceasedName}{obituaryData.relation ? ` ${obituaryData.relation}` : ''}
+                    </div>
+                    <p className="mt-2 text-gray-700">삼가 고인의 명복을 빕니다.</p>
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    {obituaryData.bereaved && (
+                      <div className="sm:col-span-2">
+                        <div className="text-xs font-bold text-gray-600">상주/유족</div>
+                        <div className="mt-1 font-bold text-gray-900 whitespace-pre-wrap">{obituaryData.bereaved}</div>
+                      </div>
+                    )}
+                    {obituaryData.deathDate && (
+                      <div>
+                        <div className="text-xs font-bold text-gray-600">별세</div>
+                        <div className="mt-1 font-bold text-gray-900">{obituaryData.deathDate}</div>
+                      </div>
+                    )}
+                    {obituaryData.funeralDate && (
+                      <div>
+                        <div className="text-xs font-bold text-gray-600">발인</div>
+                        <div className="mt-1 font-bold text-gray-900">{obituaryData.funeralDate}</div>
+                      </div>
+                    )}
+                    {(obituaryData.hallName || obituaryData.hallRoom || obituaryData.hallAddress) && (
+                      <div className="sm:col-span-2">
+                        <div className="text-xs font-bold text-gray-600">빈소</div>
+                        <div className="mt-1 font-bold text-gray-900 whitespace-pre-wrap">
+                          {[obituaryData.hallName, obituaryData.hallRoom].filter(Boolean).join(' ')}
+                          {obituaryData.hallAddress ? `\n${obituaryData.hallAddress}` : ''}
+                        </div>
+                      </div>
+                    )}
+                    {obituaryData.burialPlace && (
+                      <div className="sm:col-span-2">
+                        <div className="text-xs font-bold text-gray-600">장지</div>
+                        <div className="mt-1 font-bold text-gray-900">{obituaryData.burialPlace}</div>
+                      </div>
+                    )}
+                    {obituaryData.contact && (
+                      <div className="sm:col-span-2">
+                        <div className="text-xs font-bold text-gray-600">연락처</div>
+                        <div className="mt-1 font-bold text-gray-900">{obituaryData.contact}</div>
+                      </div>
+                    )}
+                    {obituaryData.account && (
+                      <div className="sm:col-span-2">
+                        <div className="text-xs font-bold text-gray-600">조의금 계좌</div>
+                        <div className="mt-1 font-bold text-gray-900 whitespace-pre-wrap">{obituaryData.account}</div>
+                      </div>
+                    )}
+                    {obituaryData.notice && (
+                      <div className="sm:col-span-2">
+                        <div className="text-xs font-bold text-gray-600">안내</div>
+                        <div className="mt-1 text-gray-800 whitespace-pre-wrap">{obituaryData.notice}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : rendered.nodes}
           </div>
 
           {(() => {

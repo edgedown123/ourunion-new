@@ -1,6 +1,46 @@
 
 import React, { useState, useRef, useEffect  } from 'react';
 import { BoardType, PostAttachment, Post } from '../types';
+
+
+const OBITUARY_TAG_START = '[[obituary]]';
+const OBITUARY_TAG_END = '[[/obituary]]';
+
+type ObituaryFormData = {
+  kind: 'obituary';
+  deceasedName: string;
+  relation?: string; // 예: (故) / 님 / 조합원 등
+  bereaved?: string; // 유족/상주
+  deathDate?: string; // 별세일
+  funeralDate?: string; // 발인
+  burialPlace?: string; // 장지
+  hallName?: string; // 장례식장/병원
+  hallRoom?: string; // 빈소/호실
+  hallAddress?: string; // 주소
+  contact?: string; // 연락처
+  account?: string; // 조의금 계좌 (은행/예금주/계좌번호)
+  notice?: string; // 안내 문구
+};
+
+const buildObituaryContent = (data: ObituaryFormData) => {
+  return `${OBITUARY_TAG_START}
+${JSON.stringify(data)}
+${OBITUARY_TAG_END}`;
+};
+
+const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
+  if (!content) return null;
+  const s = content.indexOf(OBITUARY_TAG_START);
+  const e = content.indexOf(OBITUARY_TAG_END);
+  if (s === -1 || e === -1 || e <= s) return null;
+  const jsonText = content.slice(s + OBITUARY_TAG_START.length, e).trim();
+  try {
+    const obj = JSON.parse(jsonText);
+    if (obj?.kind === 'obituary') return obj as ObituaryFormData;
+  } catch {}
+  return null;
+};
+
 interface PostEditorProps {
   type: BoardType;
   initialPost?: Post | null;
@@ -11,7 +51,27 @@ interface PostEditorProps {
 const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCancel }) => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const editorRef = useRef<HTMLDivElement | null>(null);
+  
+
+  // 경조사 템플릿
+  const [template, setTemplate] = useState<'normal' | 'obituary'>('normal');
+  const [obituary, setObituary] = useState<ObituaryFormData>({
+    kind: 'obituary',
+    deceasedName: '',
+    relation: '',
+    bereaved: '',
+    deathDate: '',
+    funeralDate: '',
+    burialPlace: '',
+    hallName: '',
+    hallRoom: '',
+    hallAddress: '',
+    contact: '',
+    account: '',
+    notice: '',
+  });
+
+const editorRef = useRef<HTMLDivElement | null>(null);
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -1065,6 +1125,33 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
+
+        {type === 'family_events' && (
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">작성 템플릿</label>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setTemplate('normal')}
+                className={`px-4 py-2 rounded-full border font-bold text-sm transition-all ${
+                  template === 'normal' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                일반 글
+              </button>
+              <button
+                type="button"
+                onClick={() => setTemplate('obituary')}
+                className={`px-4 py-2 rounded-full border font-bold text-sm transition-all ${
+                  template === 'obituary' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                부고
+              </button>
+            </div>
+          </div>
+        )}
+
 
         {/*
           ✅ 첨부 UI
