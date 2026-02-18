@@ -17,9 +17,18 @@ export type UserRole = 'guest' | 'member' | 'admin';
 
 export interface PostAttachment {
   name: string;
-  data: string; // Base64 string
+  /**
+   * 기존: Base64(data URL) 문자열
+   * 신규(권장): 업로드된 public URL
+   */
+  data: string;
   type: string; // MIME type
+  // 신규 메타(있으면 사용)
+  isUrl?: boolean;
+  storagePath?: string;
+  size?: number;
 }
+
 
 export interface Comment {
   id: string;

@@ -492,6 +492,71 @@ const resizeImageBeforeUpload = async (
   });
 };
 
+
+/**
+ * data URL(base64) -> File 변환
+ * (게시물 첨부를 Storage에 업로드하기 위함)
+ */
+const dataUrlToFile = async (dataUrl: string, filename: string, mime: string): Promise<File> => {
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  return new File([blob], filename, { type: mime || blob.type || 'application/octet-stream', lastModified: Date.now() });
+};
+
+/**
+ * 게시물 첨부(특히 사진)를 Supabase Storage(site-assets)에 업로드하고 public URL을 반환합니다.
+ * - 기본 폴더: posts/<postId>/
+ * - 업로드 전에 리사이즈/압축(resizeImageBeforeUpload) 적용
+ */
+export const uploadPostAttachment = async (
+  postId: string,
+  att: { name: string; data: string; type: string }
+): Promise<{ name: string; data: string; type: string; isUrl: boolean; storagePath: string; size?: number }> => {
+  if (!supabase) throw new Error('Supabase is not enabled');
+
+  // 이미 URL 형태면 그대로 반환
+  if (typeof att.data === 'string' && (att.data.startsWith('http://') || att.data.startsWith('https://'))) {
+    return { ...att, isUrl: true, storagePath: '', size: undefined };
+  }
+
+  // data URL만 업로드 대상으로 처리
+  if (!att.data?.startsWith('data:')) {
+    return { ...att, isUrl: false, storagePath: '', size: undefined };
+  }
+
+  const rawFile = await dataUrlToFile(att.data, att.name || `file-${Date.now()}`, att.type);
+
+  // ✅ 업로드 전에 리사이즈/압축
+  const processedFile = await resizeImageBeforeUpload(rawFile, {
+    // 배차표(사진 위주) 최적화: 너무 큰 사진이면 줄임
+    maxWidth: 1600,
+    maxHeight: 1600,
+    jpegQuality: 0.75,
+  });
+
+  const ext = processedFile.name.split('.').pop() || 'bin';
+  const safeName = `${Date.now()}_${Math.random().toString(16).slice(2)}.${ext}`;
+  const storagePath = `posts/${postId}/${safeName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from('site-assets')
+    .upload(storagePath, processedFile, { upsert: true, contentType: processedFile.type });
+
+  if (uploadError) throw uploadError;
+
+  const { data } = supabase.storage.from('site-assets').getPublicUrl(storagePath);
+
+  return {
+    name: att.name,
+    data: data.publicUrl,
+    type: processedFile.type,
+    isUrl: true,
+    storagePath,
+    size: processedFile.size,
+  };
+};
+
+
 export const uploadSiteImage = async (file: File, pathPrefix: string): Promise<string> => {
   if (!supabase) throw new Error('Supabase is not enabled');
 
