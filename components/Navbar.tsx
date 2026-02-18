@@ -249,7 +249,7 @@ const onDisableNoti = async () => {
             배차표(진관/도봉/송파) 하위 탭은 본문 컨테이너(max-w-4xl)와 정렬이 맞도록
             데스크톱에서만 폭을 좁혀 가운데 영역으로 옮긴다.
           */}
-          <div className={`${activeParent.id === 'dispatch' ? 'max-w-4xl' : 'max-w-7xl'} mx-auto overflow-x-auto scrollbar-hide flex items-center h-12 ${activeParent.id === 'dispatch' ? 'justify-center md:-translate-x-32' : ''}`}>
+          <div className={`${activeParent.id === 'dispatch' ? 'max-w-4xl' : 'max-w-7xl'} mx-auto overflow-x-auto scrollbar-hide flex items-center h-12 ${activeParent.id === 'dispatch' ? 'justify-center md:-translate-x-56' : ''}`}>
             <div className="flex space-x-3 h-full items-center min-w-max">
               {activeParent.children.map((child) => (
                 <button
