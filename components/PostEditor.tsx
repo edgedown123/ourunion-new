@@ -1247,6 +1247,146 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
         </button>
 </div>
 
+
+        {type === 'family_events' && template === 'obituary' && (
+          <div className="mt-2 rounded-3xl border bg-white p-6 sm:p-8">
+            <div
+              className="rounded-3xl overflow-hidden border shadow-sm"
+              style={{
+                backgroundImage: 'url(/images/obituary-bg.svg)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              <div className="bg-white/85 backdrop-blur-[1px] p-6 sm:p-10">
+                <div className="text-center">
+                  <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
+                  <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>
+                  <p className="mt-2 text-gray-700">삼가 고인의 명복을 빕니다.</p>
+                </div>
+
+                <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">고인 성함</label>
+                    <input
+                      className="w-full rounded-2xl border p-3 font-bold"
+                      value={obituary.deceasedName}
+                      onChange={(e) => setObituary((p) => ({ ...p, deceasedName: e.target.value }))}
+                      placeholder="예) 홍길동"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">표기(선택)</label>
+                    <input
+                      className="w-full rounded-2xl border p-3"
+                      value={obituary.relation || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, relation: e.target.value }))}
+                      placeholder="예) 님 / 조합원 / (故)"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">상주/유족</label>
+                    <input
+                      className="w-full rounded-2xl border p-3"
+                      value={obituary.bereaved || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, bereaved: e.target.value }))}
+                      placeholder="예) 배우자 ○○○, 장남 ○○○ ..."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">별세일</label>
+                    <input
+                      className="w-full rounded-2xl border p-3"
+                      value={obituary.deathDate || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, deathDate: e.target.value }))}
+                      placeholder="예) 2026-02-19 (목) 10:30"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">발인</label>
+                    <input
+                      className="w-full rounded-2xl border p-3"
+                      value={obituary.funeralDate || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, funeralDate: e.target.value }))}
+                      placeholder="예) 2026-02-21 (토) 07:00"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">빈소</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <input
+                        className="w-full rounded-2xl border p-3"
+                        value={obituary.hallName || ''}
+                        onChange={(e) => setObituary((p) => ({ ...p, hallName: e.target.value }))}
+                        placeholder="장례식장/병원"
+                      />
+                      <input
+                        className="w-full rounded-2xl border p-3"
+                        value={obituary.hallRoom || ''}
+                        onChange={(e) => setObituary((p) => ({ ...p, hallRoom: e.target.value }))}
+                        placeholder="호실(선택)"
+                      />
+                    </div>
+                    <input
+                      className="mt-3 w-full rounded-2xl border p-3"
+                      value={obituary.hallAddress || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, hallAddress: e.target.value }))}
+                      placeholder="주소(선택)"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">장지</label>
+                    <input
+                      className="w-full rounded-2xl border p-3"
+                      value={obituary.burialPlace || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, burialPlace: e.target.value }))}
+                      placeholder="예) ○○추모공원"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">연락처</label>
+                    <input
+                      className="w-full rounded-2xl border p-3"
+                      value={obituary.contact || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, contact: e.target.value }))}
+                      placeholder="예) 010-0000-0000"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">조의금 계좌</label>
+                    <input
+                      className="w-full rounded-2xl border p-3"
+                      value={obituary.account || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, account: e.target.value }))}
+                      placeholder="예) 국민 123-456-789012 (예금주 홍길동)"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-gray-600 mb-1">안내 문구(선택)</label>
+                    <textarea
+                      className="w-full rounded-2xl border p-3 min-h-[96px]"
+                      value={obituary.notice || ''}
+                      onChange={(e) => setObituary((p) => ({ ...p, notice: e.target.value }))}
+                      placeholder="예) 조문은 ○○까지 / 가족장으로 진행합니다 / 화환은 정중히 사양합니다"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-6 text-xs text-gray-600">
+                  * 저장하면 위 정보로 부고 게시물이 자동 작성됩니다.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!(type === 'family_events' && template === 'obituary') && (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
           <div
@@ -1365,13 +1505,31 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     />
   </div>
 )}
+        )}
+
 
 
 <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
-            onClick={() => onSave(title, content, attachments, initialPost?.id)}
-            disabled={!title || !content}
+            onClick={() => {
+              if (type === 'family_events' && template === 'obituary') {
+                if (!obituary.deceasedName.trim()) {
+                  alert('고인 성함을 입력해주세요.');
+                  return;
+                }
+                const genTitle = `부고 | ${obituary.deceasedName}${obituary.relation ? ` ${obituary.relation}` : ''}`.trim();
+                const genContent = buildObituaryContent({ ...obituary, kind: 'obituary' });
+                onSave(genTitle, genContent, attachments, initialPost?.id);
+                return;
+              }
+              if (!title.trim()) {
+                alert('제목을 입력해주세요.');
+                return;
+              }
+              onSave(title, content, attachments, initialPost?.id);
+            }}
+            disabled={type === 'family_events' && template === 'obituary' ? !obituary.deceasedName : (!title || !content)}
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {initialPost ? '수정 완료' : '게시하기'}
