@@ -1254,7 +1254,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                 backgroundPosition: 'center',
               }}
             >
-              <div className="bg-white/85 backdrop-blur-[1px] p-6 sm:p-10">
+              <div className="bg-white/70 backdrop-blur-[1px] p-6 sm:p-10">
                 <div className="text-center">
                   <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
                   <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>
