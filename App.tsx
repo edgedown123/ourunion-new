@@ -588,16 +588,14 @@ const invalidateMembersCache = () => {
         pinnedAt: null
       };
     }
-
-    
     // --------------------------------------
-    // ✅ 배차표(사진 위주) 트래픽/DB 용량 최적화
-    // - 기존: attachments에 base64(data URL)를 그대로 저장 → 단건 조회 응답이 수백 KB까지 커짐
-    // - 개선: (Supabase 사용 시) data URL 이미지는 Storage(site-assets)에 업로드하고 URL만 저장
+    // ✅ 이미지 첨부(전 게시판) 트래픽/DB 용량 최적화
+    // - 기존: attachments에 base64(data URL)를 그대로 저장 → 단건 조회 응답이 수백 KB~수 MB까지 커질 수 있음
+    // - 개선: (Supabase 사용 시) data URL 이미지는 Storage(site-assets)에 업로드하고 URL만 DB에 저장
+    //   ※ 문서/기타 파일은 기존 방식 유지(요청 시 별도 최적화 가능)
     // --------------------------------------
     try {
-      const isDispatch = typeof targetPost.type === 'string' && targetPost.type.startsWith('dispatch_');
-      if (isDispatch && cloud.isSupabaseEnabled() && targetPost.attachments?.length) {
+      if (cloud.isSupabaseEnabled() && targetPost.attachments?.length) {
         const nextAtt = await Promise.all(
           targetPost.attachments.map(async (a) => {
             // 이미지 + data URL인 경우에만 업로드
@@ -610,7 +608,7 @@ const invalidateMembersCache = () => {
         targetPost = { ...targetPost, attachments: nextAtt, content: targetPost.content || '' };
       }
     } catch (e) {
-      console.error('배차표 첨부 업로드 최적화 실패(로컬 저장으로 계속):', e);
+      console.error('이미지 첨부 업로드 최적화 실패(로컬 저장으로 계속):', e);
     }
 
 const newPosts = id ? posts.map(p => p.id === id ? targetPost : p) : [targetPost, ...posts];
