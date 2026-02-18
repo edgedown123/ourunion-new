@@ -1249,12 +1249,14 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             <div
               className="rounded-3xl overflow-hidden border shadow-sm"
               style={{
-                backgroundImage: 'url(/images/obituary-bg.svg)',
+                backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.0), rgba(0,0,0,0.05)), url(/images/obituary-bg.svg)"
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                backgroundColor: '#e9edf3',
               }}
             >
-              <div className="bg-white/70 backdrop-blur-[1px] p-6 sm:p-10">
+              <div className="bg-white/55 backdrop-blur-[1px] p-6 sm:p-10">
                 <div className="text-center">
                   <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
                   <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>

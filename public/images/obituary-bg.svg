@@ -1,64 +1,46 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
   <defs>
     <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
-      <stop offset="0" stop-color="#f7f8fa"/>
-      <stop offset="1" stop-color="#e8ebf0"/>
+      <stop offset="0" stop-color="#f3f4f7"/>
+      <stop offset="1" stop-color="#e2e6ee"/>
     </linearGradient>
-
-    <radialGradient id="petal" cx="50%" cy="40%" r="65%">
+    <radialGradient id="petal" cx="50%" cy="40%" r="70%">
       <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#f2f4f7"/>
+      <stop offset="1" stop-color="#edf0f5"/>
     </radialGradient>
-
-    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="2.8"/>
-    </filter>
-
-    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="4"/>
+    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.2"/>
       <feColorMatrix type="matrix" values="
         0 0 0 0 0
         0 0 0 0 0
         0 0 0 0 0
-        0 0 0 .18 0"/>
+        0 0 0 .25 0"/>
       <feBlend in2="SourceGraphic" mode="normal"/>
     </filter>
   </defs>
 
   <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="#000" opacity="0.03"/>
 
-  <!-- gentle vignette -->
-  <rect width="1600" height="900" fill="#000" opacity="0.05"/>
-
-  <!-- bigger chrysanthemums, higher contrast -->
-  <g opacity="0.38" filter="url(#shadow)">
-    <!-- flower symbol -->
+  <g opacity="0.85" filter="url(#shadow)">
     <g id="flower">
-      <circle r="92" fill="url(#petal)"/>
-      <g fill="none" stroke="#b8c0cc" stroke-width="7" stroke-linecap="round">
-        <path d="M0-110 C10-86 10-60 0-36 C-10-60 -10-86 0-110Z"/>
-        <path d="M0 110 C10 86 10 60 0 36 C-10 60 -10 86 0 110Z"/>
-        <path d="M110 0 C86 10 60 10 36 0 C60 -10 86 -10 110 0Z"/>
-        <path d="M-110 0 C-86 10 -60 10 -36 0 C-60 -10 -86 -10 -110 0Z"/>
-        <path d="M78-78 C62-52 48-36 28-18 C36-40 52-62 78-78Z"/>
-        <path d="M-78-78 C-62-52 -48-36 -28-18 C-36-40 -52-62 -78-78Z"/>
-        <path d="M78 78 C62 52 48 36 28 18 C36 40 52 62 78 78Z"/>
-        <path d="M-78 78 C-62 52 -48 36 -28 18 C-36 40 -52 62 -78 78Z"/>
+      <circle r="96" fill="url(#petal)"/>
+      <g fill="none" stroke="#8a94a6" stroke-width="8" stroke-linecap="round">
+        <path d="M0-118 C12-92 12-64 0-38 C-12-64 -12-92 0-118Z"/>
+        <path d="M0 118 C12 92 12 64 0 38 C-12 64 -12 92 0 118Z"/>
+        <path d="M118 0 C92 12 64 12 38 0 C64 -12 92 -12 118 0Z"/>
+        <path d="M-118 0 C-92 12 -64 12 -38 0 C-64 -12 -92 -12 -118 0Z"/>
+        <path d="M84-84 C66-56 50-38 30-18 C40-44 58-68 84-84Z"/>
+        <path d="M-84-84 C-66-56 -50-38 -30-18 C-40-44 -58-68 -84-84Z"/>
+        <path d="M84 84 C66 56 50 38 30 18 C40 44 58 68 84 84Z"/>
+        <path d="M-84 84 C-66 56 -50 38 -30 18 C-40 44 -58 68 -84 84Z"/>
       </g>
-      <circle r="24" fill="#c9d1dc"/>
+      <circle r="26" fill="#b8c0cc"/>
     </g>
 
-    <use href="#flower" x="280" y="240"/>
-    <use href="#flower" x="1340" y="260" transform="scale(0.82)"/>
-    <use href="#flower" x="1040" y="720" transform="scale(1.05)"/>
-    <use href="#flower" x="420" y="700" transform="scale(0.75)"/>
-  </g>
-
-  <!-- subtle noise dots -->
-  <g opacity="0.10">
-    <circle cx="120" cy="110" r="2" fill="#9aa3af"/>
-    <circle cx="1460" cy="160" r="2" fill="#9aa3af"/>
-    <circle cx="1320" cy="780" r="2" fill="#9aa3af"/>
-    <circle cx="220" cy="820" r="2" fill="#9aa3af"/>
+    <use href="#flower" x="260" y="230"/>
+    <use href="#flower" x="1380" y="240" transform="scale(0.88)"/>
+    <use href="#flower" x="1030" y="740" transform="scale(1.08)"/>
+    <use href="#flower" x="420" y="720" transform="scale(0.78)"/>
   </g>
 </svg>
