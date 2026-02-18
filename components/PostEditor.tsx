@@ -9,17 +9,17 @@ const OBITUARY_TAG_END = '[[/obituary]]';
 type ObituaryFormData = {
   kind: 'obituary';
   deceasedName: string;
-  relation?: string; // 예: (故) / 님 / 조합원 등
-  bereaved?: string; // 유족/상주
-  deathDate?: string; // 별세일
-  funeralDate?: string; // 발인
-  burialPlace?: string; // 장지
-  hallName?: string; // 장례식장/병원
-  hallRoom?: string; // 빈소/호실
-  hallAddress?: string; // 주소
-  contact?: string; // 연락처
-  account?: string; // 조의금 계좌 (은행/예금주/계좌번호)
-  notice?: string; // 안내 문구
+  relation?: string;
+  bereaved?: string;
+  deathDate?: string;
+  funeralDate?: string;
+  burialPlace?: string;
+  hallName?: string;
+  hallRoom?: string;
+  hallAddress?: string;
+  contact?: string;
+  account?: string;
+  notice?: string;
 };
 
 const buildObituaryContent = (data: ObituaryFormData) => {
@@ -52,8 +52,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   
-
-  // 경조사 템플릿
   const [template, setTemplate] = useState<'normal' | 'obituary'>('normal');
   const [obituary, setObituary] = useState<ObituaryFormData>({
     kind: 'obituary',
@@ -70,7 +68,6 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     account: '',
     notice: '',
   });
-
 const editorRef = useRef<HTMLDivElement | null>(null);
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1247,8 +1244,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
         </button>
 </div>
 
-
-        {type === 'family_events' && template === 'obituary' && (
+        {type === 'family_events' && template === 'obituary' ? (
           <div className="mt-2 rounded-3xl border bg-white p-6 sm:p-8">
             <div
               className="rounded-3xl overflow-hidden border shadow-sm"
@@ -1384,9 +1380,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
               </div>
             </div>
           </div>
-        )}
-
-        {!(type === 'family_events' && template === 'obituary') && (
+        ) : (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
           <div
@@ -1405,6 +1399,8 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                 style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}
               />
         </div>
+        )}
+
 
         
         
@@ -1505,30 +1501,28 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
     />
   </div>
 )}
-        )}
-
 
 
 <div className="flex justify-end space-x-3 pt-4">
           <button onClick={onCancel} className="px-6 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">취소</button>
           <button
             onClick={() => {
-              if (type === 'family_events' && template === 'obituary') {
-                if (!obituary.deceasedName.trim()) {
-                  alert('고인 성함을 입력해주세요.');
-                  return;
-                }
-                const genTitle = `부고 | ${obituary.deceasedName}${obituary.relation ? ` ${obituary.relation}` : ''}`.trim();
-                const genContent = buildObituaryContent({ ...obituary, kind: 'obituary' });
-                onSave(genTitle, genContent, attachments, initialPost?.id);
+            if (type === 'family_events' && template === 'obituary') {
+              if (!obituary.deceasedName.trim()) {
+                alert('고인 성함을 입력해주세요.');
                 return;
               }
-              if (!title.trim()) {
-                alert('제목을 입력해주세요.');
-                return;
-              }
-              onSave(title, content, attachments, initialPost?.id);
-            }}
+              const genTitle = `부고 | ${obituary.deceasedName}${obituary.relation ? ` ${obituary.relation}` : ''}`.trim();
+              const genContent = buildObituaryContent({ ...obituary, kind: 'obituary' });
+              onSave(genTitle, genContent, attachments, initialPost?.id);
+              return;
+            }
+            if (!title.trim()) {
+              alert('제목을 입력해주세요.');
+              return;
+            }
+            onSave(title, content, attachments, initialPost?.id);
+          }}
             disabled={type === 'family_events' && template === 'obituary' ? !obituary.deceasedName : (!title || !content)}
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
