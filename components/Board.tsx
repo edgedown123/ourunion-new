@@ -148,6 +148,24 @@ const Board: React.FC<BoardProps> = ({
     return `${yyyy}.${mm}.${dd} ${hh}:${min}`;
   };
 
+  // 부고(경조사) 날짜/시간 포맷팅 (datetime-local 값도 지원)
+  // 출력 예: 2026-02-19 (목) 10:30
+  const formatObituaryDateTime = (value: string | undefined) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return value;
+
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    const hh = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const week = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+
+    return `${yyyy}-${mm}-${dd} (${week}) ${hh}:${min}`;
+  };
+
+
   const Pagination = ({
     current,
     total,
@@ -690,7 +708,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
               <div
                 className="rounded-3xl overflow-hidden border shadow-sm"
                 style={{
-                  backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05)), url(/images/obituary-bg.svg)",
+                  backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05))",
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                 }}
@@ -702,9 +720,6 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                     <div className="mt-5 text-xl sm:text-2xl font-extrabold text-gray-900">
                       {obituaryData.deceasedName}
                     </div>
-                    {(obituaryData.memberName || obituaryData.relation) ? (
-                      <div className="mt-1 text-sm text-gray-600 font-semibold">{(obituaryData.memberName || obituaryData.relation)}</div>
-                    ) : null}
                     <p className="mt-2 text-gray-700">삼가 고인의 명복을 빕니다.</p>
                   </div>
 
@@ -718,13 +733,13 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                     {obituaryData.deathDate && (
                       <div>
                         <div className="text-xs font-bold text-gray-600">별세</div>
-                        <div className="mt-1 font-bold text-gray-900">{obituaryData.deathDate}</div>
+                        <div className="mt-1 font-bold text-gray-900">{formatObituaryDateTime(obituaryData.deathDate)}</div>
                       </div>
                     )}
                     {obituaryData.funeralDate && (
                       <div>
                         <div className="text-xs font-bold text-gray-600">발인</div>
-                        <div className="mt-1 font-bold text-gray-900">{obituaryData.funeralDate}</div>
+                        <div className="mt-1 font-bold text-gray-900">{formatObituaryDateTime(obituaryData.funeralDate)}</div>
                       </div>
                     )}
                     {(obituaryData.hallName || obituaryData.hallRoom || obituaryData.hallAddress) && (

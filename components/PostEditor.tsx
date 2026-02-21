@@ -42,6 +42,31 @@ const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
   return null;
 };
 
+
+// datetime-local 입력용 값으로 정규화 (기존 문자열 형태도 최대한 복원)
+const toDateTimeLocalValue = (value?: string) => {
+  if (!value) return '';
+  // 이미 datetime-local 포맷(YYYY-MM-DDTHH:mm)이면 그대로
+  if (value.includes('T')) return value.slice(0, 16);
+
+  // 예) 2026-02-19 (목) 10:30 / 2026-02-19 10:30 등에서 추출
+  const m = value.match(/(\d{4})-(\d{2})-(\d{2}).*?(\d{2}):(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}`;
+
+  // 마지막 fallback: Date 파싱이 되면 ISO에서 datetime-local 형태로 변환
+  const d = new Date(value);
+  if (!isNaN(d.getTime())) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mi = String(d.getMinutes()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  }
+  return '';
+};
+
+
 interface PostEditorProps {
   type: BoardType;
   initialPost?: Post | null;
@@ -1251,7 +1276,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             <div
               className="rounded-3xl overflow-hidden border shadow-sm"
               style={{
-                backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05)), url(/images/obituary-bg.svg)",
+                backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05))",
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
               }}
@@ -1296,19 +1321,19 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1">별세일</label>
                     <input
+                      type="datetime-local"
                       className="w-full rounded-2xl border p-3"
-                      value={obituary.deathDate || ''}
+                      value={toDateTimeLocalValue(obituary.deathDate)}
                       onChange={(e) => setObituary((p) => ({ ...p, deathDate: e.target.value }))}
-                      placeholder="예) 2026-02-19 (목) 10:30"
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1">발인</label>
                     <input
+                      type="datetime-local"
                       className="w-full rounded-2xl border p-3"
-                      value={obituary.funeralDate || ''}
+                      value={toDateTimeLocalValue(obituary.funeralDate)}
                       onChange={(e) => setObituary((p) => ({ ...p, funeralDate: e.target.value }))}
-                      placeholder="예) 2026-02-21 (토) 07:00"
                     />
                   </div>
 
