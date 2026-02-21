@@ -1321,7 +1321,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1">별세일</label>
                     <input
-                      type="datetime-local"
+                      type="date"
                       className="w-full rounded-2xl border p-3"
                       value={toDateTimeLocalValue(obituary.deathDate)}
                       onChange={(e) => setObituary((p) => ({ ...p, deathDate: e.target.value }))}
@@ -1330,7 +1330,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1">발인</label>
                     <input
-                      type="datetime-local"
+                      type="date"
                       className="w-full rounded-2xl border p-3"
                       value={toDateTimeLocalValue(obituary.funeralDate)}
                       onChange={(e) => setObituary((p) => ({ ...p, funeralDate: e.target.value }))}

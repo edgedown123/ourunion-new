@@ -149,7 +149,7 @@ const Board: React.FC<BoardProps> = ({
   };
 
   // 부고(경조사) 날짜/시간 포맷팅 (datetime-local 값도 지원)
-  // 출력 예: 2026-02-19 (목) 10:30
+  // 출력 예: 2026-02-19 (목)
   const formatObituaryDateTime = (value: string | undefined) => {
     if (!value) return '';
     const date = new Date(value);
