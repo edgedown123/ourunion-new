@@ -71,6 +71,26 @@ type WheelDatePickerProps = {
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
+const weekdayKo = (date: Date) => {
+  const map = ['일', '월', '화', '수', '목', '금', '토'] as const;
+  return map[date.getDay()];
+};
+
+const formatKoreanDateWithWeekday = (yyyy: number, mm: number, dd: number) => {
+  const dt = new Date(yyyy, mm - 1, dd);
+  return `${String(yyyy)}년 ${String(mm).padStart(2, '0')}월 ${String(dd).padStart(2, '0')}일 (${weekdayKo(dt)})`;
+};
+
+const formatISOWithWeekday = (iso: string) => {
+  const m = iso.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  const yyyy = Number(m[1]);
+  const mm = Number(m[2]);
+  const dd = Number(m[3]);
+  const dt = new Date(yyyy, mm - 1, dd);
+  return `${m[0]} (${weekdayKo(dt)})`;
+};
+
 const daysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate(); // month: 1-12
 
 // iOS 느낌의 "휠" 날짜 선택기 (모바일/데스크톱 공통)
@@ -113,7 +133,8 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
   const maxD = daysInMonth(y, mo);
   const days = Array.from({ length: maxD }, (_, i) => i + 1);
 
-  const display = value ? toISODateValue(value) : '';
+  const displayISO = value ? toISODateValue(value) : '';
+  const display = displayISO ? formatISOWithWeekday(displayISO) : '';
 
   const commit = () => {
     const yyyy = String(y).padStart(4, '0');
@@ -173,6 +194,10 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
     };
 
     return (
+      <div className="relative">
+        {/* iOS 느낌: 위/아래 페이드 */}
+        <div className="pointer-events-none absolute left-0 right-0 top-0 h-[72px] bg-gradient-to-b from-white via-white/70 to-transparent rounded-t-lg" />
+        <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-[72px] bg-gradient-to-t from-white via-white/70 to-transparent rounded-b-lg" />
       <div
         ref={ref}
         onScroll={onScroll}
@@ -186,15 +211,27 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
           overscrollBehavior: 'contain',
         }}
       >
-        {items.map((it) => (
-          <div
-            key={it}
-            className="h-[36px] flex items-center justify-center text-[18px]"
-            style={{ scrollSnapAlign: 'center' }}
-          >
-            {format ? format(it) : String(it).padStart(2, '0')}
-          </div>
-        ))}
+        {items.map((it, idx) => {
+          const selIdx = Math.max(0, items.indexOf(selected));
+          const dist = Math.abs(idx - selIdx);
+          const base = "h-[36px] flex items-center justify-center text-[18px] transition-[opacity,filter,font-weight,color] duration-150";
+          const selectedCls = dist === 0 ? "font-bold text-gray-900" : "font-normal text-gray-600";
+          const fadeCls =
+            dist === 0 ? "opacity-100 blur-0" :
+            dist === 1 ? "opacity-70 blur-0" :
+            dist === 2 ? "opacity-40 blur-[0.5px]" :
+            "opacity-20 blur-[1px]";
+          return (
+            <div
+              key={it}
+              className={`${base} ${selectedCls} ${fadeCls}`}
+              style={{ scrollSnapAlign: 'center' }}
+            >
+              {format ? format(it) : String(it).padStart(2, '0')}
+            </div>
+          );
+        })}
+      </div>
       </div>
     );
   };
@@ -234,7 +271,7 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
                 </div>
               </div>
               <div className="mt-3 text-center text-xs text-gray-500">
-                {String(y)}년 {String(mo).padStart(2, '0')}월 {String(d).padStart(2, '0')}일
+                {formatKoreanDateWithWeekday(y, mo, d)}
               </div>
             </div>
           </div>
