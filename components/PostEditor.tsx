@@ -79,14 +79,16 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
 
   const today = new Date();
   const baseYear = today.getFullYear();
-  const years = Array.from({ length: 61 }, (_, i) => baseYear - 30 + i); // (baseYear-30) ~ (baseYear+30)
+  const minYear = 2025;
+  const maxYear = 2100;
+  const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   const parsed = (() => {
     const v = toISODateValue(value);
     const m = v.match(/(\d{4})-(\d{2})-(\d{2})/);
-    if (!m) return { y: baseYear, mo: today.getMonth() + 1, d: today.getDate() };
-    return { y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]) };
+    if (!m) return { y: clamp(baseYear, minYear, maxYear), mo: today.getMonth() + 1, d: today.getDate() };
+    return { y: clamp(Number(m[1]), minYear, maxYear), mo: Number(m[2]), d: Number(m[3]) };
   })();
 
   const [y, setY] = useState(parsed.y);
@@ -142,16 +144,32 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
       if (!ref.current) return;
       const idx = Math.max(0, items.indexOf(selected));
       isProgrammatic.current = true;
-      ref.current.scrollTop = idx * rowH;
+      ref.current.scrollTo({ top: idx * rowH, behavior: 'auto' });
       const t = setTimeout(() => (isProgrammatic.current = false), 120);
       return () => clearTimeout(t);
     }, [selected, items.join(',')]);
 
+        const scrollEndTimer = useRef<number | null>(null);
+
+    const snapToNearest = (behavior: ScrollBehavior = 'smooth') => {
+      if (!ref.current) return;
+      const idx = clamp(Math.round(ref.current.scrollTop / rowH), 0, items.length - 1);
+      isProgrammatic.current = true;
+      ref.current.scrollTo({ top: idx * rowH, behavior });
+      onSelect(items[idx]);
+      window.setTimeout(() => (isProgrammatic.current = false), 180);
+    };
+
     const onScroll = () => {
       if (!ref.current) return;
       if (isProgrammatic.current) return;
-      const idx = clamp(Math.round(ref.current.scrollTop / rowH), 0, items.length - 1);
-      onSelect(items[idx]);
+
+      // 스크롤 중엔 값 업데이트를 강하게 하지 않고,
+      // 스크롤이 멈췄을 때 가장 가까운 항목으로 스르륵 스냅
+      if (scrollEndTimer.current) window.clearTimeout(scrollEndTimer.current);
+      scrollEndTimer.current = window.setTimeout(() => {
+        snapToNearest('smooth');
+      }, 90);
     };
 
     return (
@@ -161,8 +179,11 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
         className="relative h-[180px] overflow-y-scroll"
         style={{
           scrollSnapType: 'y mandatory',
+          scrollSnapStop: 'always',
           paddingTop: pad,
           paddingBottom: pad,
+          WebkitOverflowScrolling: 'touch',
+          overscrollBehavior: 'contain',
         }}
       >
         {items.map((it) => (
@@ -202,13 +223,15 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
               </button>
             </div>
 
-            <div className="relative px-4 py-6">
-              {/* 가운데 선택 하이라이트 */}
-              <div className="pointer-events-none absolute left-4 right-4 top-1/2 -translate-y-1/2 h-[36px] rounded-lg bg-gray-100/80 border" />
-              <div className="grid grid-cols-3 gap-2">
-                <WheelCol items={years} selected={y} onSelect={setY} format={(v) => String(v)} />
-                <WheelCol items={months} selected={mo} onSelect={setMo} />
-                <WheelCol items={days} selected={d} onSelect={setD} />
+            <div className="px-4 py-6">
+              <div className="relative">
+                {/* 가운데 선택 하이라이트 (휠 영역 기준으로 정확히 중앙) */}
+                <div className="pointer-events-none absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[36px] rounded-lg bg-gray-100/80 border" />
+                <div className="grid grid-cols-3 gap-2">
+                  <WheelCol items={years} selected={y} onSelect={setY} format={(v) => String(v)} />
+                  <WheelCol items={months} selected={mo} onSelect={setMo} />
+                  <WheelCol items={days} selected={d} onSelect={setD} />
+                </div>
               </div>
               <div className="mt-3 text-center text-xs text-gray-500">
                 {String(y)}년 {String(mo).padStart(2, '0')}월 {String(d).padStart(2, '0')}일
