@@ -44,28 +44,182 @@ const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
 
 
 // datetime-local 입력용 값으로 정규화 (기존 문자열 형태도 최대한 복원)
-const toDateTimeLocalValue = (value?: string) => {
+// 값에서 날짜(YYYY-MM-DD)만 최대한 추출
+const toISODateValue = (value?: string) => {
   if (!value) return '';
-  // 이미 datetime-local 포맷(YYYY-MM-DDTHH:mm)이면 그대로
-  if (value.includes('T')) return value.slice(0, 16);
 
-  // 예) 2026-02-19 (목) 10:30 / 2026-02-19 10:30 등에서 추출
-  const m = value.match(/(\d{4})-(\d{2})-(\d{2}).*?(\d{2}):(\d{2})/);
-  if (m) return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}`;
+  // ISO datetime / datetime-local / "YYYY-MM-DD ..." 형태
+  const m = value.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
 
-  // 마지막 fallback: Date 파싱이 되면 ISO에서 datetime-local 형태로 변환
+  // 마지막 fallback: Date 파싱이 되면 ISO 날짜로 변환
   const d = new Date(value);
   if (!isNaN(d.getTime())) {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mi = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+    return `${yyyy}-${mm}-${dd}`;
   }
   return '';
 };
 
+type WheelDatePickerProps = {
+  value?: string; // YYYY-MM-DD
+  onChange: (next: string) => void;
+  placeholder?: string;
+};
+
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
+const daysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate(); // month: 1-12
+
+// iOS 느낌의 "휠" 날짜 선택기 (모바일/데스크톱 공통)
+const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, placeholder = '년-월-일' }) => {
+  const [open, setOpen] = useState(false);
+
+  const today = new Date();
+  const baseYear = today.getFullYear();
+  const years = Array.from({ length: 61 }, (_, i) => baseYear - 30 + i); // (baseYear-30) ~ (baseYear+30)
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const parsed = (() => {
+    const v = toISODateValue(value);
+    const m = v.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return { y: baseYear, mo: today.getMonth() + 1, d: today.getDate() };
+    return { y: Number(m[1]), mo: Number(m[2]), d: Number(m[3]) };
+  })();
+
+  const [y, setY] = useState(parsed.y);
+  const [mo, setMo] = useState(parsed.mo);
+  const [d, setD] = useState(parsed.d);
+
+  // 열릴 때 현재 값으로 맞추기
+  useEffect(() => {
+    if (!open) return;
+    setY(parsed.y);
+    setMo(parsed.mo);
+    setD(parsed.d);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // 월/년도 변경 시 날짜 보정
+  useEffect(() => {
+    const maxD = daysInMonth(y, mo);
+    if (d > maxD) setD(maxD);
+  }, [y, mo]);
+
+  const maxD = daysInMonth(y, mo);
+  const days = Array.from({ length: maxD }, (_, i) => i + 1);
+
+  const display = value ? toISODateValue(value) : '';
+
+  const commit = () => {
+    const yyyy = String(y).padStart(4, '0');
+    const mm = String(mo).padStart(2, '0');
+    const dd = String(d).padStart(2, '0');
+    onChange(`${yyyy}-${mm}-${dd}`);
+    setOpen(false);
+  };
+
+  const clear = () => {
+    onChange('');
+    setOpen(false);
+  };
+
+  const WheelCol: React.FC<{
+    items: number[];
+    selected: number;
+    onSelect: (v: number) => void;
+    format?: (v: number) => string;
+  }> = ({ items, selected, onSelect, format }) => {
+    const ref = useRef<HTMLDivElement | null>(null);
+    const rowH = 36; // px
+    const pad = 72; // (rowH*2) -> center highlight
+    const isProgrammatic = useRef(false);
+
+    // 스크롤을 선택값에 맞춤
+    useEffect(() => {
+      if (!ref.current) return;
+      const idx = Math.max(0, items.indexOf(selected));
+      isProgrammatic.current = true;
+      ref.current.scrollTop = idx * rowH;
+      const t = setTimeout(() => (isProgrammatic.current = false), 120);
+      return () => clearTimeout(t);
+    }, [selected, items.join(',')]);
+
+    const onScroll = () => {
+      if (!ref.current) return;
+      if (isProgrammatic.current) return;
+      const idx = clamp(Math.round(ref.current.scrollTop / rowH), 0, items.length - 1);
+      onSelect(items[idx]);
+    };
+
+    return (
+      <div
+        ref={ref}
+        onScroll={onScroll}
+        className="relative h-[180px] overflow-y-scroll"
+        style={{
+          scrollSnapType: 'y mandatory',
+          paddingTop: pad,
+          paddingBottom: pad,
+        }}
+      >
+        {items.map((it) => (
+          <div
+            key={it}
+            className="h-[36px] flex items-center justify-center text-[18px]"
+            style={{ scrollSnapAlign: 'center' }}
+          >
+            {format ? format(it) : String(it).padStart(2, '0')}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full rounded-2xl border p-3 text-left"
+      >
+        {display ? display : <span className="text-gray-400">{placeholder}</span>}
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
+          <div className="relative w-full sm:w-[420px] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <button type="button" className="text-sm text-gray-500" onClick={clear}>
+                지우기
+              </button>
+              <div className="text-sm font-bold">날짜 선택</div>
+              <button type="button" className="text-sm font-bold" onClick={commit}>
+                확인
+              </button>
+            </div>
+
+            <div className="relative px-4 py-6">
+              {/* 가운데 선택 하이라이트 */}
+              <div className="pointer-events-none absolute left-4 right-4 top-1/2 -translate-y-1/2 h-[36px] rounded-lg bg-gray-100/80 border" />
+              <div className="grid grid-cols-3 gap-2">
+                <WheelCol items={years} selected={y} onSelect={setY} format={(v) => String(v)} />
+                <WheelCol items={months} selected={mo} onSelect={setMo} />
+                <WheelCol items={days} selected={d} onSelect={setD} />
+              </div>
+              <div className="mt-3 text-center text-xs text-gray-500">
+                {String(y)}년 {String(mo).padStart(2, '0')}월 {String(d).padStart(2, '0')}일
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
 interface PostEditorProps {
   type: BoardType;
@@ -1320,20 +1474,16 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
 
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1">별세일</label>
-                    <input
-                      type="date"
-                      className="w-full rounded-2xl border p-3"
-                      value={toDateTimeLocalValue(obituary.deathDate)}
-                      onChange={(e) => setObituary((p) => ({ ...p, deathDate: e.target.value }))}
+                    <WheelDatePicker
+                      value={toISODateValue(obituary.deathDate)}
+                      onChange={(v) => setObituary((p) => ({ ...p, deathDate: v }))}
                     />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-600 mb-1">발인</label>
-                    <input
-                      type="date"
-                      className="w-full rounded-2xl border p-3"
-                      value={toDateTimeLocalValue(obituary.funeralDate)}
-                      onChange={(e) => setObituary((p) => ({ ...p, funeralDate: e.target.value }))}
+                    <WheelDatePicker
+                      value={toISODateValue(obituary.funeralDate)}
+                      onChange={(v) => setObituary((p) => ({ ...p, funeralDate: v }))}
                     />
                   </div>
 
