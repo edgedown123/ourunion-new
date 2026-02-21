@@ -247,7 +247,7 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
           <div className="relative w-full sm:w-[420px] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl">
             <div className="flex items-center justify-between px-4 py-3 border-b">
@@ -1351,9 +1351,9 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4"> 
+    <div className={`max-w-4xl mx-auto py-8 ${template === 'obituary' ? 'px-0 sm:px-4' : 'px-4'}`}> 
 
-      <div className="space-y-6 bg-white p-8 rounded-lg border">
+      <div className={`space-y-6 bg-white ${template === 'obituary' ? 'p-4 sm:p-8 rounded-none sm:rounded-lg border-0 sm:border' : 'p-8 rounded-lg border'}`}>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
           <input
@@ -1644,7 +1644,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
 
 {fileOpenSheet && (
   <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => setFileOpenSheet(null)}>
-    <div className="w-[88%] max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
       <div className="border-t">
         <button
           type="button"
@@ -1684,7 +1684,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
 
 {imageOpenSheet && (
   <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40" onClick={() => setImageOpenSheet(null)}>
-    <div className="w-[88%] max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
       <div className="border-t">
         <button
           type="button"
