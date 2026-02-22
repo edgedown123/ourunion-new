@@ -117,6 +117,104 @@ const formatISOWithWeekday = (iso: string) => {
 
 const daysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate(); // month: 1-12
 
+type WheelColProps = {
+  items: number[];
+  selected: number;
+  onSelect: (v: number) => void;
+  format?: (v: number) => string;
+  ariaLabel?: string;
+};
+
+// 공용 휠 컬럼(년/월/일/시/분) - iOS 느낌의 스크롤+스냅
+const WheelCol: React.FC<WheelColProps> = ({ items, selected, onSelect, format, ariaLabel }) => {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const rowH = 36; // px
+  const pad = rowH * 2; // 위/아래 여백(중앙 하이라이트 맞춤)
+  const isProgrammatic = useRef(false);
+  const rafId = useRef<number | null>(null);
+  const snapTimer = useRef<number | null>(null);
+
+  const selectedIndex = Math.max(0, items.indexOf(selected));
+
+  const scrollToIndex = (idx: number, behavior: ScrollBehavior = "smooth") => {
+    if (!ref.current) return;
+    const clamped = Math.max(0, Math.min(items.length - 1, idx));
+    isProgrammatic.current = true;
+    ref.current.scrollTo({ top: clamped * rowH, behavior });
+    onSelect(items[clamped]);
+    window.setTimeout(() => (isProgrammatic.current = false), 220);
+  };
+
+  // 선택값이 바뀌면 해당 위치로 맞춤 (열릴 때 / 외부 변경)
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.scrollTo({ top: selectedIndex * rowH, behavior: "auto" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
+  const handleScroll = () => {
+    if (!ref.current) return;
+    if (isProgrammatic.current) return;
+
+    // 스크롤 중에는 rAF로만 가볍게 처리
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    rafId.current = requestAnimationFrame(() => {
+      if (!ref.current) return;
+
+      // 사용자가 손을 떼고 멈추면 가장 가까운 값으로 스냅
+      if (snapTimer.current) window.clearTimeout(snapTimer.current);
+      snapTimer.current = window.setTimeout(() => {
+        if (!ref.current) return;
+        const idx = Math.round(ref.current.scrollTop / rowH);
+        scrollToIndex(idx, "smooth");
+      }, 120);
+    });
+  };
+
+  return (
+    <div
+      ref={ref}
+      aria-label={ariaLabel}
+      onScroll={handleScroll}
+      style={{
+        height: rowH * 5,
+        overflowY: "auto",
+        paddingTop: pad,
+        paddingBottom: pad,
+        scrollSnapType: "y mandatory",
+        WebkitOverflowScrolling: "touch",
+      }}
+    >
+      {items.map((v, i) => {
+        const isSel = v === selected;
+        const dist = Math.min(3, Math.abs(i - selectedIndex)); // 0~3
+        const opacity = isSel ? 1 : dist === 1 ? 0.55 : dist === 2 ? 0.32 : 0.18;
+        const blur = isSel ? 0 : dist === 1 ? 0.2 : dist === 2 ? 0.6 : 1.0;
+
+        return (
+          <div
+            key={v}
+            onClick={() => scrollToIndex(i, "smooth")}
+            style={{
+              height: rowH,
+              lineHeight: `${rowH}px`,
+              textAlign: "center",
+              cursor: "pointer",
+              userSelect: "none",
+              scrollSnapAlign: "center",
+              fontWeight: isSel ? 700 : 400,
+              opacity,
+              filter: blur ? `blur(${blur}px)` : "none",
+            }}
+          >
+            {format ? format(v) : String(v).padStart(2, "0")}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 // iOS 느낌의 "휠" 날짜 선택기 (모바일/데스크톱 공통)
 const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, placeholder = '년-월-일' }) => {
   const [open, setOpen] = useState(false);
