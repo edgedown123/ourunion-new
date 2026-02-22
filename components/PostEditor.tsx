@@ -395,6 +395,7 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
               <div className="mt-3 text-center text-xs text-gray-500">
                 {formatKoreanDateWithWeekday(y, mo, d)}
               </div>
+            </div>
           </div>
         </div>
       )}
