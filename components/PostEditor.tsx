@@ -520,6 +520,7 @@ const WheelDateTimePicker: React.FC<WheelDateTimePickerProps> = ({ value, onChan
             </div>
           </div>
         </div>
+        </div>
       )}
     </>
   );
