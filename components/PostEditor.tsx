@@ -431,6 +431,7 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [content, setContent] = useState('');
   
   const [template, setTemplate] = useState<'normal' | 'obituary'>('normal');
+  const [obituaryFullscreen, setObituaryFullscreen] = useState(false);
   const [obituary, setObituary] = useState<ObituaryFormData>({
     kind: 'obituary',
     deceasedName: '',
@@ -839,6 +840,17 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // 모바일에서 부고 템플릿을 선택하면 전체화면 편집 모드로 바로 띄움
+  useEffect(() => {
+    if (type === 'family_events' && template === 'obituary' && isMobile) {
+      setObituaryFullscreen(true);
+    } else {
+      setObituaryFullscreen(false);
+    }
+  }, [type, template, isMobile]);
+
+
 
   
   const renderRawContentToEditor = (raw: string) => {
