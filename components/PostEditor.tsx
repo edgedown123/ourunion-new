@@ -63,6 +63,25 @@ const toISODateValue = (value?: string) => {
   return '';
 };
 
+
+// 값에서 날짜+시간(YYYY-MM-DD HH:MM)을 최대한 추출
+const toISODateTimeParts = (value?: string) => {
+  const datePart = toISODateValue(value);
+  if (!datePart) return { date: '', hh: 9, min: 0 };
+
+  // HH:MM 추출 (예: "2026-02-21 09:00", "2026-02-21T09:00", "... 09:00")
+  const tm = (value || '').match(/(\d{2}):(\d{2})/);
+  if (tm) return { date: datePart, hh: clamp(Number(tm[1]), 0, 23), min: clamp(Number(tm[2]), 0, 59) };
+
+  return { date: datePart, hh: 9, min: 0 };
+};
+
+const buildISODateTime = (date: string, hh: number, min: number) => {
+  if (!date) return '';
+  const H = String(clamp(hh, 0, 23)).padStart(2, '0');
+  const M = String(clamp(min, 0, 59)).padStart(2, '0');
+  return `${date} ${H}:${M}`;
+};
 type WheelDatePickerProps = {
   value?: string; // YYYY-MM-DD
   onChange: (next: string) => void;
@@ -75,6 +94,11 @@ const weekdayKo = (date: Date) => {
   const map = ['일', '월', '화', '수', '목', '금', '토'] as const;
   return map[date.getDay()];
 };
+
+// 공용 휠 컬럼 (연/월/일/시/분)
+
+
+
 
 const formatKoreanDateWithWeekday = (yyyy: number, mm: number, dd: number) => {
   const dt = new Date(yyyy, mm - 1, dd);
@@ -287,6 +311,120 @@ interface PostEditorProps {
   onSave: (title: string, content: string, attachments?: PostAttachment[], id?: string) => void;
   onCancel: () => void;
 }
+
+
+type WheelDateTimePickerProps = {
+  value?: string; // "YYYY-MM-DD HH:MM" (시간 선택 포함)
+  onChange: (next: string) => void;
+  placeholder?: string;
+};
+
+// iOS 느낌의 "휠" 날짜+시간 선택기 (발인용)
+const WheelDateTimePicker: React.FC<WheelDateTimePickerProps> = ({ value, onChange, placeholder = '년-월-일 --:--' }) => {
+  const [open, setOpen] = useState(false);
+
+  const today = new Date();
+  const baseYear = today.getFullYear();
+  const minYear = 2025;
+  const maxYear = 2100;
+  const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => minYear + i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const minutes = Array.from({ length: 60 }, (_, i) => i);
+
+  const parsed = (() => {
+    const parts = toISODateTimeParts(value);
+    const m = parts.date.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return { y: clamp(baseYear, minYear, maxYear), mo: today.getMonth() + 1, d: today.getDate(), hh: parts.hh, min: parts.min };
+    return { y: clamp(Number(m[1]), minYear, maxYear), mo: Number(m[2]), d: Number(m[3]), hh: parts.hh, min: parts.min };
+  })();
+
+  const [y, setY] = useState(parsed.y);
+  const [mo, setMo] = useState(parsed.mo);
+  const [d, setD] = useState(parsed.d);
+  const [hh, setHh] = useState(parsed.hh);
+  const [min, setMin] = useState(parsed.min);
+
+  useEffect(() => {
+    if (!open) return;
+    const parts = toISODateTimeParts(value);
+    const m = parts.date.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) {
+      setY(clamp(baseYear, minYear, maxYear));
+      setMo(today.getMonth() + 1);
+      setD(today.getDate());
+      setHh(parts.hh);
+      setMin(parts.min);
+      return;
+    }
+    setY(clamp(Number(m[1]), minYear, maxYear));
+    setMo(Number(m[2]));
+    setD(Number(m[3]));
+    setHh(parts.hh);
+    setMin(parts.min);
+  }, [open]);
+
+  useEffect(() => {
+    const dim = daysInMonth(y, mo);
+    if (d > dim) setD(dim);
+  }, [y, mo]);
+
+  const confirm = () => {
+    const isoDate = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    onChange(buildISODateTime(isoDate, hh, min));
+    setOpen(false);
+  };
+
+  const clear = () => {
+    onChange('');
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="w-full rounded-2xl border p-3 text-left flex items-center justify-between bg-white"
+      >
+        <span className={value ? 'text-gray-900 font-bold' : 'text-gray-400'}>
+          {value ? `${formatISOWithWeekday(toISODateValue(value))} ${String(toISODateTimeParts(value).hh).padStart(2,'0')}:${String(toISODateTimeParts(value).min).padStart(2,'0')}` : placeholder}
+        </span>
+        <i className="fas fa-calendar text-gray-400"></i>
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <div className="relative w-[92vw] max-w-[520px] rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <button type="button" className="text-gray-500 font-bold" onClick={clear}>지우기</button>
+              <div className="font-extrabold">날짜/시간 선택</div>
+              <button type="button" className="text-gray-900 font-extrabold" onClick={confirm}>확인</button>
+            </div>
+
+            <div className="relative px-4 py-4">
+              {/* 중앙 하이라이트 */}
+              <div className="pointer-events-none absolute left-4 right-4 top-1/2 -translate-y-1/2 h-[36px] rounded-xl bg-gray-200/60" />
+
+              <div className="grid grid-cols-5 gap-2">
+                <WheelCol items={years} selected={y} onSelect={setY} format={(v) => String(v)} />
+                <WheelCol items={months} selected={mo} onSelect={setMo} />
+                <WheelCol items={Array.from({ length: daysInMonth(y, mo) }, (_, i) => i + 1)} selected={d} onSelect={setD} />
+                <WheelCol items={hours} selected={hh} onSelect={setHh} format={(v)=>String(v).padStart(2,'0')} />
+                <WheelCol items={minutes} selected={min} onSelect={setMin} format={(v)=>String(v).padStart(2,'0')} />
+              </div>
+
+              <div className="mt-3 text-center text-sm text-gray-600 font-bold">
+                {`${y}년 ${String(mo).padStart(2,'0')}월 ${String(d).padStart(2,'0')}일 (${weekdayKo(new Date(y, mo - 1, d))}) ${String(hh).padStart(2,'0')}:${String(min).padStart(2,'0')}`}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
 
 const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCancel }) => {
   const [title, setTitle] = useState('');
@@ -1379,7 +1517,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
               </button>
               <button
                 type="button"
-                onClick={() => setTemplate('obituary')}
+                onClick={() => { setTemplate('obituary'); if (isMobile) setObituaryFullscreen(true); }}
                 className={`px-4 py-2 rounded-full border font-bold text-sm transition-all ${
                   template === 'obituary' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'
                 }`}
@@ -1486,137 +1624,300 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
 </div>
 
         {type === 'family_events' && template === 'obituary' ? (
-          <div className="mt-2 rounded-3xl border bg-white p-6 sm:p-8">
-            <div
-              className="rounded-3xl overflow-hidden border shadow-sm"
-              style={{
-                backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05))",
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-              }}
-            >
-              <div className="bg-white/45 backdrop-blur-[1px] p-6 sm:p-10">
-                <div className="text-center">
-                  <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
-                  <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>
-                  <p className="mt-2 text-gray-700">삼가 고인의 명복을 빕니다.</p>
-                </div>
+          <>
+            {isMobile ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setObituaryFullscreen(true)}
+                  className="mt-4 w-full py-3 rounded-xl bg-white border font-extrabold text-gray-800 flex items-center justify-center gap-2"
+                >
+                  <i className="fas fa-expand"></i>
+                  부고 템플릿 전체화면 편집
+                </button>
 
-                <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">고인 성함</label>
-                    <input
-                      className="w-full rounded-2xl border p-3 font-bold"
-                      value={obituary.deceasedName}
-                      onChange={(e) => setObituary((p) => ({ ...p, deceasedName: e.target.value }))}
-                      placeholder="예) 홍길동"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">조합원 성함</label>
-                    <input
-                      className="w-full rounded-2xl border p-3"
-                      value={(obituary.memberName || obituary.relation) || ''}
-                      onChange={(e) => setObituary((p) => ({ ...p, memberName: e.target.value, relation: e.target.value }))}
-                      placeholder="예) 000조합원 부친상, 000조합원 모친상"
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-gray-600 mb-1">상주/유족</label>
-                    <input
-                      className="w-full rounded-2xl border p-3"
-                      value={obituary.bereaved || ''}
-                      onChange={(e) => setObituary((p) => ({ ...p, bereaved: e.target.value }))}
-                      placeholder="예) 배우자 ○○○, 장남 ○○○ ..."
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">별세일</label>
-                    <WheelDatePicker
-                      value={toISODateValue(obituary.deathDate)}
-                      onChange={(v) => setObituary((p) => ({ ...p, deathDate: v }))}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">발인</label>
-                    <WheelDatePicker
-                      value={toISODateValue(obituary.funeralDate)}
-                      onChange={(v) => setObituary((p) => ({ ...p, funeralDate: v }))}
-                    />
-                  </div>
-
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-gray-600 mb-1">빈소</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <input
-                        className="w-full rounded-2xl border p-3"
-                        value={obituary.hallName || ''}
-                        onChange={(e) => setObituary((p) => ({ ...p, hallName: e.target.value }))}
-                        placeholder="장례식장/병원"
-                      />
-                      <input
-                        className="w-full rounded-2xl border p-3"
-                        value={obituary.hallRoom || ''}
-                        onChange={(e) => setObituary((p) => ({ ...p, hallRoom: e.target.value }))}
-                        placeholder="호실(선택)"
-                      />
+                {obituaryFullscreen && (
+                  <div className="fixed inset-0 z-[70] bg-white">
+                    <div className="sticky top-0 z-[71] flex items-center justify-between px-4 py-3 border-b bg-white">
+                      <div className="font-extrabold">부고 템플릿</div>
+                      <button
+                        type="button"
+                        onClick={() => setObituaryFullscreen(false)}
+                        className="px-3 py-2 rounded-lg bg-gray-900 text-white font-extrabold"
+                      >
+                        닫기
+                      </button>
                     </div>
-                    <input
-                      className="mt-3 w-full rounded-2xl border p-3"
-                      value={obituary.hallAddress || ''}
-                      onChange={(e) => setObituary((p) => ({ ...p, hallAddress: e.target.value }))}
-                      placeholder="주소(선택)"
-                    />
-                  </div>
+                    <div className="h-[calc(100vh-56px)] overflow-y-auto">
+                      <div className="h-full w-full bg-white p-4">
+                                  <div
+                                    className="overflow-hidden border-0 shadow-none rounded-none"
+                                    style={{
+                                      backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05))",
+                                      backgroundSize: 'cover',
+                                      backgroundPosition: 'center',
+                                    }}
+                                  >
+                                    <div className="bg-white/45 backdrop-blur-[1px] p-4">
+                                      <div className="text-center">
+                                        <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
+                                        <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>
+                                        <p className="mt-2 text-gray-700">삼가 고인의 명복을 빕니다.</p>
+                                      </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">장지</label>
-                    <input
-                      className="w-full rounded-2xl border p-3"
-                      value={obituary.burialPlace || ''}
-                      onChange={(e) => setObituary((p) => ({ ...p, burialPlace: e.target.value }))}
-                      placeholder="예) ○○추모공원"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">연락처</label>
-                    <input
-                      className="w-full rounded-2xl border p-3"
-                      value={obituary.contact || ''}
-                      onChange={(e) => setObituary((p) => ({ ...p, contact: e.target.value }))}
-                      placeholder="예) 010-0000-0000"
-                    />
-                  </div>
+                                      <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">고인 성함</label>
+                                          <input
+                                            className="w-full rounded-2xl border p-3 font-bold"
+                                            value={obituary.deceasedName}
+                                            onChange={(e) => setObituary((p) => ({ ...p, deceasedName: e.target.value }))}
+                                            placeholder="예) 홍길동"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">조합원 성함</label>
+                                          <input
+                                            className="w-full rounded-2xl border p-3"
+                                            value={(obituary.memberName || obituary.relation) || ''}
+                                            onChange={(e) => setObituary((p) => ({ ...p, memberName: e.target.value, relation: e.target.value }))}
+                                            placeholder="예) 000조합원 부친상, 000조합원 모친상"
+                                          />
+                                        </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-gray-600 mb-1">조의금 계좌</label>
-                    <input
-                      className="w-full rounded-2xl border p-3"
-                      value={obituary.account || ''}
-                      onChange={(e) => setObituary((p) => ({ ...p, account: e.target.value }))}
-                      placeholder="예) 국민 123-456-789012 (예금주 홍길동)"
-                    />
-                  </div>
+                                        <div className="sm:col-span-2">
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">상주/유족</label>
+                                          <input
+                                            className="w-full rounded-2xl border p-3"
+                                            value={obituary.bereaved || ''}
+                                            onChange={(e) => setObituary((p) => ({ ...p, bereaved: e.target.value }))}
+                                            placeholder="예) 배우자 ○○○, 장남 ○○○ ..."
+                                          />
+                                        </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold text-gray-600 mb-1">안내 문구(선택)</label>
-                    <textarea
-                      className="w-full rounded-2xl border p-3 min-h-[96px]"
-                      value={obituary.notice || ''}
-                      onChange={(e) => setObituary((p) => ({ ...p, notice: e.target.value }))}
-                      placeholder="예) 조문은 ○○까지 / 가족장으로 진행합니다 / 화환은 정중히 사양합니다"
-                    />
-                  </div>
-                </div>
+                                        <div>
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">별세일</label>
+                                          <WheelDatePicker
+                                            value={toISODateValue(obituary.deathDate)}
+                                            onChange={(v) => setObituary((p) => ({ ...p, deathDate: v }))}
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">발인</label>
+                                          <WheelDateTimePicker
+                                            value={obituary.funeralDate}
+                                            onChange={(v) => setObituary((p) => ({ ...p, funeralDate: v }))}
+                                          />
+                                        </div>
 
-                <div className="mt-6 text-xs text-gray-600">
-                  * 저장하면 위 정보로 부고 게시물이 자동 작성됩니다.
-                </div>
-              </div>
-            </div>
-          </div>
+                                        <div className="sm:col-span-2">
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">빈소</label>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <input
+                                              className="w-full rounded-2xl border p-3"
+                                              value={obituary.hallName || ''}
+                                              onChange={(e) => setObituary((p) => ({ ...p, hallName: e.target.value }))}
+                                              placeholder="장례식장/병원"
+                                            />
+                                            <input
+                                              className="w-full rounded-2xl border p-3"
+                                              value={obituary.hallRoom || ''}
+                                              onChange={(e) => setObituary((p) => ({ ...p, hallRoom: e.target.value }))}
+                                              placeholder="호실(선택)"
+                                            />
+                                          </div>
+                                          <input
+                                            className="mt-3 w-full rounded-2xl border p-3"
+                                            value={obituary.hallAddress || ''}
+                                            onChange={(e) => setObituary((p) => ({ ...p, hallAddress: e.target.value }))}
+                                            placeholder="주소(선택)"
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">장지</label>
+                                          <input
+                                            className="w-full rounded-2xl border p-3"
+                                            value={obituary.burialPlace || ''}
+                                            onChange={(e) => setObituary((p) => ({ ...p, burialPlace: e.target.value }))}
+                                            placeholder="예) ○○추모공원"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">연락처</label>
+                                          <input
+                                            className="w-full rounded-2xl border p-3"
+                                            value={obituary.contact || ''}
+                                            onChange={(e) => setObituary((p) => ({ ...p, contact: e.target.value }))}
+                                            placeholder="예) 010-0000-0000"
+                                          />
+                                        </div>
+
+                                        <div className="sm:col-span-2">
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">조의금 계좌</label>
+                                          <input
+                                            className="w-full rounded-2xl border p-3"
+                                            value={obituary.account || ''}
+                                            onChange={(e) => setObituary((p) => ({ ...p, account: e.target.value }))}
+                                            placeholder="예) 국민 123-456-789012 (예금주 홍길동)"
+                                          />
+                                        </div>
+
+                                        <div className="sm:col-span-2">
+                                          <label className="block text-xs font-bold text-gray-600 mb-1">안내 문구(선택)</label>
+                                          <textarea
+                                            className="w-full rounded-2xl border p-3 min-h-[96px]"
+                                            value={obituary.notice || ''}
+                                            onChange={(e) => setObituary((p) => ({ ...p, notice: e.target.value }))}
+                                            placeholder="예) 조문은 ○○까지 / 가족장으로 진행합니다 / 화환은 정중히 사양합니다"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-6 text-xs text-gray-600">
+                                        * 저장하면 위 정보로 부고 게시물이 자동 작성됩니다.
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="mt-2 rounded-3xl border bg-white p-6 sm:p-8">
+                          <div
+                            className="rounded-3xl overflow-hidden border shadow-sm"
+                            style={{
+                              backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05))",
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                            }}
+                          >
+                            <div className="bg-white/45 backdrop-blur-[1px] p-6 sm:p-10">
+                              <div className="text-center">
+                                <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
+                                <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>
+                                <p className="mt-2 text-gray-700">삼가 고인의 명복을 빕니다.</p>
+                              </div>
+
+                              <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">고인 성함</label>
+                                  <input
+                                    className="w-full rounded-2xl border p-3 font-bold"
+                                    value={obituary.deceasedName}
+                                    onChange={(e) => setObituary((p) => ({ ...p, deceasedName: e.target.value }))}
+                                    placeholder="예) 홍길동"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">조합원 성함</label>
+                                  <input
+                                    className="w-full rounded-2xl border p-3"
+                                    value={(obituary.memberName || obituary.relation) || ''}
+                                    onChange={(e) => setObituary((p) => ({ ...p, memberName: e.target.value, relation: e.target.value }))}
+                                    placeholder="예) 000조합원 부친상, 000조합원 모친상"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">상주/유족</label>
+                                  <input
+                                    className="w-full rounded-2xl border p-3"
+                                    value={obituary.bereaved || ''}
+                                    onChange={(e) => setObituary((p) => ({ ...p, bereaved: e.target.value }))}
+                                    placeholder="예) 배우자 ○○○, 장남 ○○○ ..."
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">별세일</label>
+                                  <WheelDatePicker
+                                    value={toISODateValue(obituary.deathDate)}
+                                    onChange={(v) => setObituary((p) => ({ ...p, deathDate: v }))}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">발인</label>
+                                  <WheelDateTimePicker
+                                    value={obituary.funeralDate}
+                                    onChange={(v) => setObituary((p) => ({ ...p, funeralDate: v }))}
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">빈소</label>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <input
+                                      className="w-full rounded-2xl border p-3"
+                                      value={obituary.hallName || ''}
+                                      onChange={(e) => setObituary((p) => ({ ...p, hallName: e.target.value }))}
+                                      placeholder="장례식장/병원"
+                                    />
+                                    <input
+                                      className="w-full rounded-2xl border p-3"
+                                      value={obituary.hallRoom || ''}
+                                      onChange={(e) => setObituary((p) => ({ ...p, hallRoom: e.target.value }))}
+                                      placeholder="호실(선택)"
+                                    />
+                                  </div>
+                                  <input
+                                    className="mt-3 w-full rounded-2xl border p-3"
+                                    value={obituary.hallAddress || ''}
+                                    onChange={(e) => setObituary((p) => ({ ...p, hallAddress: e.target.value }))}
+                                    placeholder="주소(선택)"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">장지</label>
+                                  <input
+                                    className="w-full rounded-2xl border p-3"
+                                    value={obituary.burialPlace || ''}
+                                    onChange={(e) => setObituary((p) => ({ ...p, burialPlace: e.target.value }))}
+                                    placeholder="예) ○○추모공원"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">연락처</label>
+                                  <input
+                                    className="w-full rounded-2xl border p-3"
+                                    value={obituary.contact || ''}
+                                    onChange={(e) => setObituary((p) => ({ ...p, contact: e.target.value }))}
+                                    placeholder="예) 010-0000-0000"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">조의금 계좌</label>
+                                  <input
+                                    className="w-full rounded-2xl border p-3"
+                                    value={obituary.account || ''}
+                                    onChange={(e) => setObituary((p) => ({ ...p, account: e.target.value }))}
+                                    placeholder="예) 국민 123-456-789012 (예금주 홍길동)"
+                                  />
+                                </div>
+
+                                <div className="sm:col-span-2">
+                                  <label className="block text-xs font-bold text-gray-600 mb-1">안내 문구(선택)</label>
+                                  <textarea
+                                    className="w-full rounded-2xl border p-3 min-h-[96px]"
+                                    value={obituary.notice || ''}
+                                    onChange={(e) => setObituary((p) => ({ ...p, notice: e.target.value }))}
+                                    placeholder="예) 조문은 ○○까지 / 가족장으로 진행합니다 / 화환은 정중히 사양합니다"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="mt-6 text-xs text-gray-600">
+                                * 저장하면 위 정보로 부고 게시물이 자동 작성됩니다.
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+            )}
+          </>
         ) : (
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>

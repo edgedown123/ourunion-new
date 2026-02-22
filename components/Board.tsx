@@ -150,18 +150,50 @@ const Board: React.FC<BoardProps> = ({
 
   // 부고(경조사) 날짜/시간 포맷팅 (datetime-local 값도 지원)
   // 출력 예: 2026-02-19 (목)
-  const formatObituaryDateTime = (value: string | undefined) => {
+  
+  // 부고(경조사) 날짜 포맷 (시간 제외)
+  // 출력 예: 2026-02-19 (목)
+  const formatObituaryDate = (value: string | undefined) => {
     if (!value) return '';
-    const date = new Date(value);
-    if (isNaN(date.getTime())) return value;
+    const m = value.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return value;
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const week = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+      return `${yyyy}-${mm}-${dd} (${week})`;
+    }
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const week = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+    return `${m[1]}-${m[2]}-${m[3]} (${week})`;
+  };
 
-    const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
-    const hh = String(date.getHours()).padStart(2, '0');
-    const min = String(date.getMinutes()).padStart(2, '0');
-    const week = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+const formatObituaryDateTime = (value: string | undefined) => {
+    if (!value) return '';
+    const dm = value.match(/(\d{4})-(\d{2})-(\d{2})/);
+    const tm = value.match(/(\d{2}):(\d{2})/);
 
+    if (!dm) {
+      const date = new Date(value);
+      if (isNaN(date.getTime())) return value;
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      const hh = String(date.getHours()).padStart(2, '0');
+      const min = String(date.getMinutes()).padStart(2, '0');
+      const week = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
+      return `${yyyy}-${mm}-${dd} (${week}) ${hh}:${min}`;
+    }
+
+    const yyyy = dm[1];
+    const mm = dm[2];
+    const dd = dm[3];
+    const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
+    const week = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+    const hh = tm ? tm[1] : '09';
+    const min = tm ? tm[2] : '00';
     return `${yyyy}-${mm}-${dd} (${week}) ${hh}:${min}`;
   };
 
@@ -733,7 +765,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                     {obituaryData.deathDate && (
                       <div>
                         <div className="text-xs font-bold text-gray-600">별세</div>
-                        <div className="mt-1 font-bold text-gray-900">{formatObituaryDateTime(obituaryData.deathDate)}</div>
+                        <div className="mt-1 font-bold text-gray-900">{formatObituaryDate(obituaryData.deathDate)}</div>
                       </div>
                     )}
                     {obituaryData.funeralDate && (
