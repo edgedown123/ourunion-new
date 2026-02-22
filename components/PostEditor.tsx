@@ -395,7 +395,6 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
               <div className="mt-3 text-center text-xs text-gray-500">
                 {formatKoreanDateWithWeekday(y, mo, d)}
               </div>
-            </div>
           </div>
         </div>
       )}
@@ -513,11 +512,11 @@ const WheelDateTimePicker: React.FC<WheelDateTimePickerProps> = ({ value, onChan
                 <WheelCol items={hours} selected={hh} onSelect={setHh} format={(v)=>String(v).padStart(2,'0')} />
                 <WheelCol items={minutes} selected={min} onSelect={setMin} format={(v)=>String(v).padStart(2,'0')} />
               </div>
+              </div>
 
               <div className="mt-3 text-center text-sm text-gray-600 font-bold">
                 {`${y}년 ${String(mo).padStart(2,'0')}월 ${String(d).padStart(2,'0')}일 (${weekdayKo(new Date(y, mo - 1, d))}) ${String(hh).padStart(2,'0')}:${String(min).padStart(2,'0')}`}
               </div>
-            </div>
           </div>
         </div>
         </div>

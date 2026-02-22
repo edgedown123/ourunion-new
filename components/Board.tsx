@@ -738,7 +738,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
           <div className="prose prose-sky max-w-none text-gray-700 leading-relaxed min-h-[120px] md:min-h-[200px] text-base md:text-lg prose-p:my-3">
             {obituaryData ? (
               <div
-                className="rounded-3xl overflow-hidden border shadow-sm"
+                className="rounded-3xl overflow-hidden border shadow-sm w-[calc(100vw-16px)] sm:w-full mx-auto relative left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0"
                 style={{
                   backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05))",
                   backgroundSize: 'cover',
