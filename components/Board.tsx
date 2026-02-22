@@ -672,7 +672,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
 
     return (
       <>
-      <div className="max-w-4xl mx-auto py-8 px-2 sm:px-5 animate-fadeIn">
+      <div className="w-full max-w-none sm:max-w-4xl mx-auto py-6 sm:py-8 px-0 sm:px-5 animate-fadeIn">
         <div className="flex justify-between items-center mb-8">
           <button onClick={() => onSelectPost(null)} className="flex items-center text-gray-500 hover:text-sky-primary group font-bold">
             <i className="fas fa-arrow-left mr-2 group-hover:-translate-x-1 transition-transform"></i> 목록으로
@@ -745,7 +745,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                   backgroundPosition: 'center',
                 }}
               >
-                <div className="bg-white/45 backdrop-blur-[1px] p-6 sm:p-10">
+                <div className="bg-white/45 backdrop-blur-[1px] p-4 sm:p-10">
                   <div className="text-center">
                     <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">謹 弔</div>
                     <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">부고</h2>

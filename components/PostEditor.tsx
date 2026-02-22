@@ -501,11 +501,12 @@ const WheelDateTimePicker: React.FC<WheelDateTimePickerProps> = ({ value, onChan
               <button type="button" className="text-gray-900 font-extrabold" onClick={confirm}>확인</button>
             </div>
 
-            <div className="relative px-4 py-4">
-              {/* 중앙 하이라이트 */}
-              <div className="pointer-events-none absolute left-4 right-4 top-1/2 -translate-y-1/2 h-[36px] rounded-xl bg-gray-200/60" />
+            <div className="px-4 py-4">
+              <div className="relative">
+                {/* 가운데 선택 하이라이트 (휠 영역 기준 중앙 정렬) */}
+                <div className="pointer-events-none absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[36px] rounded-xl bg-gray-200/60" />
 
-              <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-2">
                 <WheelCol items={years} selected={y} onSelect={setY} format={(v) => String(v)} />
                 <WheelCol items={months} selected={mo} onSelect={setMo} />
                 <WheelCol items={Array.from({ length: daysInMonth(y, mo) }, (_, i) => i + 1)} selected={d} onSelect={setD} />
