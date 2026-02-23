@@ -1974,6 +1974,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
                   </div>
                 )}
               </>
+        ) : null}
             
           {type === 'family_events' && template === 'wedding' ? (
             <>
