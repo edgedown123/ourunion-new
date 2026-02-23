@@ -4,6 +4,10 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 const OBITUARY_TAG_START = '[[obituary]]';
 const OBITUARY_TAG_END = '[[/obituary]]';
 
+
+const WEDDING_TAG_START = '[[wedding]]';
+const WEDDING_TAG_END = '[[/wedding]]';
+
 type ObituaryFormData = {
   kind: 'obituary';
   deceasedName: string;
@@ -21,6 +25,22 @@ type ObituaryFormData = {
   notice?: string;
 };
 
+
+type WeddingFormData = {
+  kind: 'wedding';
+  groomName: string;
+  brideName: string;
+  ceremonyDateTime?: string;
+  venueName?: string;
+  hallRoom?: string;
+  venueAddress?: string;
+  contact?: string;
+  accountGroom?: string;
+  accountBride?: string;
+  message?: string;
+  notice?: string;
+};
+
 const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
   if (!content) return null;
   const s = content.indexOf(OBITUARY_TAG_START);
@@ -30,6 +50,21 @@ const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
   try {
     const obj = JSON.parse(jsonText);
     if (obj?.kind === 'obituary') return obj as ObituaryFormData;
+  } catch {}
+  return null;
+};
+
+
+
+const tryParseWeddingContent = (content: string): WeddingFormData | null => {
+  if (!content) return null;
+  const s = content.indexOf(WEDDING_TAG_START);
+  const e = content.indexOf(WEDDING_TAG_END);
+  if (s === -1 || e === -1 || e <= s) return null;
+  const jsonText = content.slice(s + WEDDING_TAG_START.length, e).trim();
+  try {
+    const obj = JSON.parse(jsonText);
+    if (obj?.kind === 'wedding') return obj as WeddingFormData;
   } catch {}
   return null;
 };
@@ -667,6 +702,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
 
     const rendered = renderContentWithInlineImages(selectedPost.content);
     const obituaryData = (selectedPost.type === 'family_events') ? tryParseObituaryContent(selectedPost.content || '') : null;
+    const weddingData = (selectedPost.type === 'family_events') ? tryParseWeddingContent(selectedPost.content || '') : null;
 
     const isNoticeCategory = selectedPost.type === 'notice_all' || selectedPost.type === 'family_events';
 
@@ -810,7 +846,98 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
                   </div>
                 </div>
               </div>
-            ) : rendered.nodes}
+            
+) : (weddingData ? (
+              <div
+                className="rounded-3xl overflow-hidden border shadow-sm w-[calc(100vw-16px)] sm:w-full mx-auto relative left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0"
+                style={{
+                  backgroundImage: "radial-gradient(closest-side, rgba(255,255,255,0.00), rgba(0,0,0,0.05))",
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                }}
+              >
+                <div className="bg-white/45 backdrop-blur-[1px] p-4 sm:p-10">
+                  <div className="text-center">
+                    <div className="text-sm tracking-[0.35em] text-gray-700 font-bold">INVITATION</div>
+                    <h2 className="mt-3 text-2xl sm:text-3xl font-extrabold text-gray-900">결혼</h2>
+                    <div className="mt-5 text-xl sm:text-2xl font-extrabold text-gray-900">
+                      {weddingData.groomName} <span className="mx-2">♥</span> {weddingData.brideName}
+                    </div>
+                    <p className="mt-2 text-gray-700">소중한 날, 함께해 주세요.</p>
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                    {weddingData.ceremonyDateTime && (
+                      <div className="sm:col-span-2 flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center shrink-0">
+                          <i className="fas fa-calendar-alt"></i>
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-gray-900">예식 일시</div>
+                          <div className="text-gray-800 whitespace-pre-wrap">{formatObituaryDateTime(weddingData.ceremonyDateTime)}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {(weddingData.venueName || weddingData.hallRoom || weddingData.venueAddress) && (
+                      <div className="sm:col-span-2 flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center shrink-0">
+                          <i className="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-gray-900">장소</div>
+                          <div className="text-gray-800 whitespace-pre-wrap">
+                            {[weddingData.venueName, weddingData.hallRoom, weddingData.venueAddress].filter(Boolean).join('\n')}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {weddingData.contact && (
+                      <div className="sm:col-span-2 flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center shrink-0">
+                          <i className="fas fa-phone"></i>
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-gray-900">연락처</div>
+                          <div className="text-gray-800 whitespace-pre-wrap">{weddingData.contact}</div>
+                        </div>
+                      </div>
+                    )}
+
+                    {(weddingData.accountGroom || weddingData.accountBride) && (
+                      <div className="sm:col-span-2 flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-gray-900 text-white flex items-center justify-center shrink-0">
+                          <i className="fas fa-credit-card"></i>
+                        </div>
+                        <div>
+                          <div className="font-extrabold text-gray-900">계좌</div>
+                          <div className="text-gray-800 whitespace-pre-wrap">
+                            {weddingData.accountGroom ? `신랑측: ${weddingData.accountGroom}` : ''}
+                            {weddingData.accountGroom && weddingData.accountBride ? '\n' : ''}
+                            {weddingData.accountBride ? `신부측: ${weddingData.accountBride}` : ''}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {weddingData.message && (
+                      <div className="sm:col-span-2 mt-2">
+                        <div className="font-extrabold text-gray-900 mb-1">메시지</div>
+                        <div className="text-gray-800 whitespace-pre-wrap">{weddingData.message}</div>
+                      </div>
+                    )}
+
+                    {weddingData.notice && (
+                      <div className="sm:col-span-2 mt-2">
+                        <div className="font-extrabold text-gray-900 mb-1">안내</div>
+                        <div className="text-gray-800 whitespace-pre-wrap">{weddingData.notice}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : rendered.nodes)}
           </div>
 
           {(() => {
