@@ -2179,40 +2179,6 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             onSave(title, content, attachments, initialPost?.id);
           }}
             disabled={type === 'family_events' && template === 'obituary' ? !obituary.deceasedName : (!title || !content)}
-        {type === 'family_events' && template === 'wedding' && (
-          <div className="mt-6 space-y-4">
-            <h3 className="text-lg font-bold">결혼 안내</h3>
-
-            <input
-              type="text"
-              placeholder="신랑 이름"
-              className="w-full border p-2 rounded"
-            />
-
-            <input
-              type="text"
-              placeholder="신부 이름"
-              className="w-full border p-2 rounded"
-            />
-
-            <input
-              type="date"
-              className="w-full border p-2 rounded"
-            />
-
-            <input
-              type="time"
-              className="w-full border p-2 rounded"
-            />
-
-            <input
-              type="text"
-              placeholder="예식장 / 장소"
-              className="w-full border p-2 rounded"
-            />
-          </div>
-        )}
-        
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {initialPost ? '수정 완료' : '게시하기'}
