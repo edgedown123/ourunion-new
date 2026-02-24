@@ -1056,7 +1056,7 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
               </svg>
             </button>
             <img data-attach-kind="img" data-img-index="${idx}" draggable="true" style="max-width:100%;border-radius:10px;display:block;" />
-          </div>
+          </div>`
           );
           html.push('<br/>');
         } else if (kind === 'file') {
@@ -1086,7 +1086,7 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
               >
                 결혼
               </button>
-            </div>
+            </div>`
           );
           html.push('<br/>');
         }
