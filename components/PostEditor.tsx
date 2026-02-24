@@ -422,16 +422,6 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
               <button type="button" className="text-sm font-bold" onClick={commit}>
                 확인
               </button>
-
-              <button
-                type="button"
-                onClick={() => { setTemplate('wedding'); if (isMobile) setWeddingFullscreen(true); }}
-                className={`px-4 py-2 rounded-full border font-bold text-sm transition-all ${
-                  template === 'wedding' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                결혼
-              </button>
             </div>
 
             <div className="px-4 py-6">
@@ -1076,16 +1066,6 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
                   <path d="M12 15V3"/>
                 </svg>
               </button>
-
-              <button
-                type="button"
-                onClick={() => { setTemplate('wedding'); if (isMobile) setWeddingFullscreen(true); }}
-                className={`px-4 py-2 rounded-full border font-bold text-sm transition-all ${
-                  template === 'wedding' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                결혼
-              </button>
             </div>`
           );
           html.push('<br/>');
@@ -1717,7 +1697,6 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
               >
                 부고
               </button>
-
               <button
                 type="button"
                 onClick={() => { setTemplate('wedding'); if (isMobile) setWeddingFullscreen(true); }}
