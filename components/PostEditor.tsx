@@ -6,6 +6,9 @@ import { BoardType, PostAttachment, Post } from '../types';
 const OBITUARY_TAG_START = '[[obituary]]';
 const OBITUARY_TAG_END = '[[/obituary]]';
 
+const WEDDING_TAG_START = '[[wedding]]';
+const WEDDING_TAG_END = '[[/wedding]]';
+
 type ObituaryFormData = {
   kind: 'obituary';
   deceasedName: string;
@@ -23,6 +26,25 @@ type ObituaryFormData = {
   notice?: string;
 };
 
+type WeddingFormData = {
+  kind: 'wedding';
+  groomName: string;
+  brideName: string;
+  groomFather?: string;
+  groomMother?: string;
+  brideFather?: string;
+  brideMother?: string;
+  ceremonyDateTime?: string; // YYYY-MM-DD HH:MM
+  venueName?: string;
+  hallDetail?: string;
+  address?: string;
+  contact?: string;
+  accountGroom?: string;
+  accountBride?: string;
+  message?: string;
+};
+
+
 const buildObituaryContent = (data: ObituaryFormData) => {
   return `${OBITUARY_TAG_START}
 ${JSON.stringify(data)}
@@ -38,6 +60,26 @@ const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
   try {
     const obj = JSON.parse(jsonText);
     if (obj?.kind === 'obituary') return obj as ObituaryFormData;
+  } catch {}
+  return null;
+};
+
+
+const buildWeddingContent = (data: WeddingFormData) => {
+  return `${WEDDING_TAG_START}
+${JSON.stringify(data)}
+${WEDDING_TAG_END}`;
+};
+
+const tryParseWeddingContent = (content: string): WeddingFormData | null => {
+  if (!content) return null;
+  const s = content.indexOf(WEDDING_TAG_START);
+  const e = content.indexOf(WEDDING_TAG_END);
+  if (s === -1 || e === -1 || e <= s) return null;
+  const jsonText = content.slice(s + WEDDING_TAG_START.length, e).trim();
+  try {
+    const obj = JSON.parse(jsonText);
+    if (obj?.kind === 'wedding') return obj as WeddingFormData;
   } catch {}
   return null;
 };
@@ -380,6 +422,16 @@ const WheelDatePicker: React.FC<WheelDatePickerProps> = ({ value, onChange, plac
               <button type="button" className="text-sm font-bold" onClick={commit}>
                 확인
               </button>
+
+              <button
+                type="button"
+                onClick={() => { setTemplate('wedding'); if (isMobile) setWeddingFullscreen(true); }}
+                className={`px-4 py-2 rounded-full border font-bold text-sm transition-all ${
+                  template === 'wedding' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                결혼
+              </button>
             </div>
 
             <div className="px-4 py-6">
@@ -530,8 +582,9 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   
-  const [template, setTemplate] = useState<'normal' | 'obituary'>('normal');
+  const [template, setTemplate] = useState<'normal' | 'obituary' | 'wedding'>('normal');
   const [obituaryFullscreen, setObituaryFullscreen] = useState(false);
+  const [weddingFullscreen, setWeddingFullscreen] = useState(false);
   const [obituary, setObituary] = useState<ObituaryFormData>({
     kind: 'obituary',
     deceasedName: '',
@@ -547,6 +600,24 @@ const PostEditor: React.FC<PostEditorProps> = ({ type, initialPost, onSave, onCa
     contact: '',
     account: '',
     notice: '',
+  });
+
+  const [wedding, setWedding] = useState<WeddingFormData>({
+    kind: 'wedding',
+    groomName: '',
+    brideName: '',
+    groomFather: '',
+    groomMother: '',
+    brideFather: '',
+    brideMother: '',
+    ceremonyDateTime: '',
+    venueName: '',
+    hallDetail: '',
+    address: '',
+    contact: '',
+    accountGroom: '',
+    accountBride: '',
+    message: '',
   });
 const editorRef = useRef<HTMLDivElement | null>(null);
   const [attachments, setAttachments] = useState<PostAttachment[]>([]);
@@ -1004,6 +1075,16 @@ const handleEditorClick = (e: React.MouseEvent<HTMLDivElement>) => {
                   <path d="M7 10l5 5 5-5"/>
                   <path d="M12 15V3"/>
                 </svg>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { setTemplate('wedding'); if (isMobile) setWeddingFullscreen(true); }}
+                className={`px-4 py-2 rounded-full border font-bold text-sm transition-all ${
+                  template === 'wedding' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                결혼
               </button>
             </div>`
           );
@@ -1636,12 +1717,238 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
               >
                 부고
               </button>
+
+              <button
+                type="button"
+                onClick={() => { setTemplate('wedding'); if (isMobile) setWeddingFullscreen(true); }}
+                className={`px-4 py-2 rounded-full border font-bold text-sm transition-all ${
+                  template === 'wedding' ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                결혼
+              </button>
             </div>
           </div>
         )}
 
 
-        {/*
+        
+        {type === 'family_events' && template === 'wedding' && (
+          <div className="mt-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-base font-bold">결혼 템플릿</div>
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setWeddingFullscreen(true)}
+                  className="px-3 py-2 rounded-lg border text-sm font-bold bg-white hover:bg-gray-50"
+                >
+                  결혼 템플릿 전체화면 편집
+                </button>
+              )}
+            </div>
+
+            <div className="rounded-2xl border bg-white p-4 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-sm font-bold mb-1">신랑</div>
+                  <input
+                    value={wedding.groomName}
+                    onChange={(e) => setWedding((p) => ({ ...p, groomName: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="예) 홍길동"
+                  />
+                </div>
+                <div>
+                  <div className="text-sm font-bold mb-1">신부</div>
+                  <input
+                    value={wedding.brideName}
+                    onChange={(e) => setWedding((p) => ({ ...p, brideName: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="예) 김영희"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-sm font-bold mb-1">신랑측 부모</div>
+                  <input
+                    value={wedding.groomFather}
+                    onChange={(e) => setWedding((p) => ({ ...p, groomFather: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2 mb-2"
+                    placeholder="부: (선택)"
+                  />
+                  <input
+                    value={wedding.groomMother}
+                    onChange={(e) => setWedding((p) => ({ ...p, groomMother: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="모: (선택)"
+                  />
+                </div>
+                <div>
+                  <div className="text-sm font-bold mb-1">신부측 부모</div>
+                  <input
+                    value={wedding.brideFather}
+                    onChange={(e) => setWedding((p) => ({ ...p, brideFather: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2 mb-2"
+                    placeholder="부: (선택)"
+                  />
+                  <input
+                    value={wedding.brideMother}
+                    onChange={(e) => setWedding((p) => ({ ...p, brideMother: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="모: (선택)"
+                  />
+                </div>
+              </div>
+
+              <WheelDateTimePicker
+                label="예식 일시"
+                value={wedding.ceremonyDateTime || ''}
+                onChange={(v) => setWedding((p) => ({ ...p, ceremonyDateTime: v }))}
+              />
+
+              <div>
+                <div className="text-sm font-bold mb-1">예식장</div>
+                <input
+                  value={wedding.venueName}
+                  onChange={(e) => setWedding((p) => ({ ...p, venueName: e.target.value }))}
+                  className="w-full border rounded-xl px-3 py-2 mb-2"
+                  placeholder="예) OO웨딩홀"
+                />
+                <input
+                  value={wedding.hallDetail}
+                  onChange={(e) => setWedding((p) => ({ ...p, hallDetail: e.target.value }))}
+                  className="w-full border rounded-xl px-3 py-2"
+                  placeholder="예) 3층 그랜드홀 (선택)"
+                />
+              </div>
+
+              <div>
+                <div className="text-sm font-bold mb-1">주소</div>
+                <input
+                  value={wedding.address}
+                  onChange={(e) => setWedding((p) => ({ ...p, address: e.target.value }))}
+                  className="w-full border rounded-xl px-3 py-2"
+                  placeholder="예) 서울시 ..."
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-sm font-bold mb-1">연락처</div>
+                  <input
+                    value={wedding.contact}
+                    onChange={(e) => setWedding((p) => ({ ...p, contact: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="예) 010-0000-0000"
+                  />
+                </div>
+                <div>
+                  <div className="text-sm font-bold mb-1">안내 문구</div>
+                  <input
+                    value={wedding.message}
+                    onChange={(e) => setWedding((p) => ({ ...p, message: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="예) 축하해 주셔서 감사합니다 (선택)"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <div className="text-sm font-bold mb-1">축의금 계좌(신랑측)</div>
+                  <input
+                    value={wedding.accountGroom}
+                    onChange={(e) => setWedding((p) => ({ ...p, accountGroom: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="예) 국민 123-456-789012 (홍길동) (선택)"
+                  />
+                </div>
+                <div>
+                  <div className="text-sm font-bold mb-1">축의금 계좌(신부측)</div>
+                  <input
+                    value={wedding.accountBride}
+                    onChange={(e) => setWedding((p) => ({ ...p, accountBride: e.target.value }))}
+                    className="w-full border rounded-xl px-3 py-2"
+                    placeholder="예) 신한 123-456-789012 (김영희) (선택)"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {weddingFullscreen && (
+              <div className="fixed inset-0 z-[70] bg-white">
+                <div className="sticky top-0 z-[71] flex items-center justify-between px-4 py-3 border-b bg-white">
+                  <button type="button" onClick={() => setWeddingFullscreen(false)} className="text-sm font-bold px-3 py-2 rounded-lg border">
+                    닫기
+                  </button>
+                  <div className="font-extrabold">결혼</div>
+                  <div style={{ width: 64 }} />
+                </div>
+                <div className="p-4 overflow-auto" style={{ height: 'calc(100vh - 56px)' }}>
+                  {/* 위의 카드 UI를 그대로 재사용 */}
+                  <div className="rounded-2xl border bg-white p-4 space-y-4">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <div className="text-sm font-bold mb-1">신랑</div>
+                        <input value={wedding.groomName} onChange={(e) => setWedding((p) => ({ ...p, groomName: e.target.value }))} className="w-full border rounded-xl px-3 py-2" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold mb-1">신부</div>
+                        <input value={wedding.brideName} onChange={(e) => setWedding((p) => ({ ...p, brideName: e.target.value }))} className="w-full border rounded-xl px-3 py-2" />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <div className="text-sm font-bold mb-1">신랑측 부모</div>
+                        <input value={wedding.groomFather} onChange={(e) => setWedding((p) => ({ ...p, groomFather: e.target.value }))} className="w-full border rounded-xl px-3 py-2 mb-2" placeholder="부(선택)" />
+                        <input value={wedding.groomMother} onChange={(e) => setWedding((p) => ({ ...p, groomMother: e.target.value }))} className="w-full border rounded-xl px-3 py-2" placeholder="모(선택)" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold mb-1">신부측 부모</div>
+                        <input value={wedding.brideFather} onChange={(e) => setWedding((p) => ({ ...p, brideFather: e.target.value }))} className="w-full border rounded-xl px-3 py-2 mb-2" placeholder="부(선택)" />
+                        <input value={wedding.brideMother} onChange={(e) => setWedding((p) => ({ ...p, brideMother: e.target.value }))} className="w-full border rounded-xl px-3 py-2" placeholder="모(선택)" />
+                      </div>
+                    </div>
+
+                    <WheelDateTimePicker label="예식 일시" value={wedding.ceremonyDateTime || ''} onChange={(v) => setWedding((p) => ({ ...p, ceremonyDateTime: v }))} />
+
+                    <div>
+                      <div className="text-sm font-bold mb-1">예식장</div>
+                      <input value={wedding.venueName} onChange={(e) => setWedding((p) => ({ ...p, venueName: e.target.value }))} className="w-full border rounded-xl px-3 py-2 mb-2" />
+                      <input value={wedding.hallDetail} onChange={(e) => setWedding((p) => ({ ...p, hallDetail: e.target.value }))} className="w-full border rounded-xl px-3 py-2" placeholder="홀/층 (선택)" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold mb-1">주소</div>
+                      <input value={wedding.address} onChange={(e) => setWedding((p) => ({ ...p, address: e.target.value }))} className="w-full border rounded-xl px-3 py-2" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold mb-1">연락처</div>
+                      <input value={wedding.contact} onChange={(e) => setWedding((p) => ({ ...p, contact: e.target.value }))} className="w-full border rounded-xl px-3 py-2" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold mb-1">안내 문구</div>
+                      <input value={wedding.message} onChange={(e) => setWedding((p) => ({ ...p, message: e.target.value }))} className="w-full border rounded-xl px-3 py-2" placeholder="(선택)" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold mb-1">계좌(신랑측)</div>
+                      <input value={wedding.accountGroom} onChange={(e) => setWedding((p) => ({ ...p, accountGroom: e.target.value }))} className="w-full border rounded-xl px-3 py-2" placeholder="(선택)" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold mb-1">계좌(신부측)</div>
+                      <input value={wedding.accountBride} onChange={(e) => setWedding((p) => ({ ...p, accountBride: e.target.value }))} className="w-full border rounded-xl px-3 py-2" placeholder="(선택)" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+{/*
           ✅ 첨부 UI
           - 기존: 파일 선택 버튼이 모바일에서만 노출되어 데스크톱에서는 "글 수정" 화면에서 첨부를 추가할 수 없었음
           - 개선: 데스크톱에서도 파일 선택 버튼을 제공 + (데스크톱) 박스 클릭/Enter/Space로 파일 선택 가능
@@ -2178,7 +2485,7 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
             }
             onSave(title, content, attachments, initialPost?.id);
           }}
-            disabled={type === 'family_events' && template === 'obituary' ? !obituary.deceasedName : (!title || !content)}
+            disabled={type === 'family_events' && template === 'obituary' ? !obituary.deceasedName : (type === 'family_events' && template === 'wedding' ? (!wedding.groomName || !wedding.brideName) : (!title || !content))}
             className="px-6 py-2 bg-sky-primary text-white rounded-lg font-bold hover:opacity-90 disabled:opacity-50 transition-all"
           >
             {initialPost ? '수정 완료' : '게시하기'}

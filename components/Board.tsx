@@ -4,6 +4,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 const OBITUARY_TAG_START = '[[obituary]]';
 const OBITUARY_TAG_END = '[[/obituary]]';
 
+const WEDDING_TAG_START = '[[wedding]]';
+const WEDDING_TAG_END = '[[/wedding]]';
+
 type ObituaryFormData = {
   kind: 'obituary';
   deceasedName: string;
@@ -21,6 +24,25 @@ type ObituaryFormData = {
   notice?: string;
 };
 
+type WeddingFormData = {
+  kind: 'wedding';
+  groomName: string;
+  brideName: string;
+  groomFather?: string;
+  groomMother?: string;
+  brideFather?: string;
+  brideMother?: string;
+  ceremonyDateTime?: string; // YYYY-MM-DD HH:MM
+  venueName?: string;
+  hallDetail?: string;
+  address?: string;
+  contact?: string;
+  accountGroom?: string;
+  accountBride?: string;
+  message?: string;
+};
+
+
 const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
   if (!content) return null;
   const s = content.indexOf(OBITUARY_TAG_START);
@@ -30,6 +52,20 @@ const tryParseObituaryContent = (content: string): ObituaryFormData | null => {
   try {
     const obj = JSON.parse(jsonText);
     if (obj?.kind === 'obituary') return obj as ObituaryFormData;
+  } catch {}
+  return null;
+};
+
+
+const tryParseWeddingContent = (content: string): WeddingFormData | null => {
+  if (!content) return null;
+  const s = content.indexOf(WEDDING_TAG_START);
+  const e = content.indexOf(WEDDING_TAG_END);
+  if (s === -1 || e === -1 || e <= s) return null;
+  const jsonText = content.slice(s + WEDDING_TAG_START.length, e).trim();
+  try {
+    const obj = JSON.parse(jsonText);
+    if (obj?.kind === 'wedding') return obj as WeddingFormData;
   } catch {}
   return null;
 };
