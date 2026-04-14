@@ -191,7 +191,7 @@ const App: React.FC = () => {
       return;
     }
 
-    // 공고/공지, 경조사만 관리자 글쓰기 제한
+    // 공고/공지, 경조사 글쓰기는 관리자만
     if (['notice_all', 'family_events'].includes(targetType) && userRole !== 'admin') {
       setIsWriting(false);
       setWritingType(null);
@@ -588,38 +588,51 @@ const invalidateMembersCache = () => {
         pinnedAt: null
       };
     }
-    // --------------------------------------
-    // ✅ 이미지 첨부(전 게시판) 트래픽/DB 용량 최적화
-    // - 기존: attachments에 base64(data URL)를 그대로 저장 → 단건 조회 응답이 수백 KB~수 MB까지 커질 수 있음
-    // - 개선: (Supabase 사용 시) data URL 이미지는 Storage(site-assets)에 업로드하고 URL만 DB에 저장
-    //   ※ 문서/기타 파일은 기존 방식 유지(요청 시 별도 최적화 가능)
-    // --------------------------------------
     try {
+      // --------------------------------------
+      // ✅ 첨부파일 저장 최적화
+      // - 일반 조합원(member)은 이미지/문서 모두 Storage(site-assets)에 업로드 후 URL만 게시글에 저장
+      // - 관리자는 기존 동작과의 호환을 위해 이미지 data URL만 Storage로 올리고 문서는 현재 방식 유지
+      // --------------------------------------
       if (cloud.isSupabaseEnabled() && targetPost.attachments?.length) {
         const nextAtt = await Promise.all(
           targetPost.attachments.map(async (a) => {
-            // 이미지 + data URL인 경우에만 업로드
-            if (a?.type?.startsWith('image/') && typeof a.data === 'string' && a.data.startsWith('data:')) {
+            const isDataUrl = typeof a?.data === 'string' && a.data.startsWith('data:');
+            if (!isDataUrl) return a;
+
+            if (userRole === 'member') {
               return await cloud.uploadPostAttachment(targetPost.id, a);
             }
+
+            if (a?.type?.startsWith('image/')) {
+              return await cloud.uploadPostAttachment(targetPost.id, a);
+            }
+
             return a;
           })
         );
+
         targetPost = { ...targetPost, attachments: nextAtt, content: targetPost.content || '' };
       }
-    } catch (e) {
-      console.error('이미지 첨부 업로드 최적화 실패(로컬 저장으로 계속):', e);
-    }
 
-const newPosts = id ? posts.map(p => p.id === id ? targetPost : p) : [targetPost, ...posts];
-    setPosts(newPosts);
-    saveToLocal('posts', newPosts);
-    await cloud.savePostToCloud(targetPost);
-    
-    alert('성공적으로 저장되었습니다.');
-    setIsWriting(false);
-    pushNav({ tab: activeTab, postId: null, writing: false });
-    setEditingPost(null);
+      const newPosts = id ? posts.map(p => p.id === id ? targetPost : p) : [targetPost, ...posts];
+      setPosts(newPosts);
+      saveToLocal('posts', newPosts);
+      await cloud.savePostToCloud(targetPost);
+
+      alert('성공적으로 저장되었습니다.');
+      setIsWriting(false);
+      pushNav({ tab: activeTab, postId: null, writing: false });
+      setEditingPost(null);
+    } catch (e: any) {
+      console.error('게시글 저장 실패:', e);
+      const msg = String(e?.message || e || '알 수 없는 오류');
+      if (/row-level security|not allowed|permission|403|401/i.test(msg)) {
+        alert('첨부파일 또는 게시글 저장 권한이 없어 등록에 실패했습니다. 제공한 SQL 정책 파일을 Supabase에 적용한 뒤 다시 시도해주세요.');
+      } else {
+        alert(`게시글 저장 중 오류가 발생했습니다.\n${msg}`);
+      }
+    }
   };
 
   const handleSaveComment = async (postId: string, content: string, parentId?: string) => {
@@ -1114,7 +1127,7 @@ await cloud.deleteMemberFromCloud(user.id);
   const handleWriteClick = (specificType?: BoardType) => {
     const rawType = specificType || activeTab;
     const targetType = (rawType === 'notice' ? 'notice_all' : rawType) as any;
-    // 공고/공지, 경조사만 관리자 글쓰기 가능
+    // 공고/공지, 경조사는 관리자만 글쓰기 가능
     if (['notice_all', 'family_events'].includes(targetType as string) && userRole !== 'admin') {
       setShowAdminLogin(true);
       return;

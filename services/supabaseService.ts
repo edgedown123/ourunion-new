@@ -165,8 +165,7 @@ export const updatePostViewsInCloud = async (id: string, views: number) => {
 export const savePostToCloud = async (post: Post) => {
   if (!supabase) return;
 
-  try {
-    const { error } = await supabase.from('posts').upsert({
+  const { error } = await supabase.from('posts').upsert({
       id: post.id,
       type: post.type,
       title: post.title,
@@ -181,9 +180,9 @@ export const savePostToCloud = async (post: Post) => {
       pinned_at: post.pinnedAt ?? null,
     });
 
-    if (error) throw error;
-  } catch (err) {
-    console.error('클라우드 게시글 저장 실패:', err);
+  if (error) {
+    console.error('클라우드 게시글 저장 실패:', error);
+    throw error;
   }
 };
 
@@ -504,9 +503,10 @@ const dataUrlToFile = async (dataUrl: string, filename: string, mime: string): P
 };
 
 /**
- * 게시물 첨부(특히 사진)를 Supabase Storage(site-assets)에 업로드하고 public URL을 반환합니다.
+ * 게시물 첨부를 Supabase Storage(site-assets)에 업로드하고 public URL을 반환합니다.
  * - 기본 폴더: posts/<postId>/
- * - 업로드 전에 리사이즈/압축(resizeImageBeforeUpload) 적용
+ * - 이미지는 업로드 전에 리사이즈/압축 적용
+ * - 문서/기타 파일은 원본 그대로 업로드
  */
 export const uploadPostAttachment = async (
   postId: string,
@@ -526,13 +526,13 @@ export const uploadPostAttachment = async (
 
   const rawFile = await dataUrlToFile(att.data, att.name || `file-${Date.now()}`, att.type);
 
-  // ✅ 업로드 전에 리사이즈/압축
-  const processedFile = await resizeImageBeforeUpload(rawFile, {
-    // 배차표(사진 위주) 최적화: 너무 큰 사진이면 줄임
-    maxWidth: 1600,
-    maxHeight: 1600,
-    jpegQuality: 0.75,
-  });
+  const processedFile = rawFile.type?.startsWith('image/')
+    ? await resizeImageBeforeUpload(rawFile, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        jpegQuality: 0.75,
+      })
+    : rawFile;
 
   const ext = processedFile.name.split('.').pop() || 'bin';
   const safeName = `${Date.now()}_${Math.random().toString(16).slice(2)}.${ext}`;

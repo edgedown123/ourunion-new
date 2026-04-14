@@ -93,7 +93,7 @@ export default function Footer({
         <p>서울특별시 은평구 통일로 1190 진관버스공영차고지</p>
 
         <p>
-          TEL: 010-9490-4694&nbsp;&nbsp; FAX: 050-4339-4694
+          TEL: 02-123-4567&nbsp;&nbsp; FAX: 02-1234-5678
         </p>
 
         <p>EMAIL: edgedown@naver.com</p>

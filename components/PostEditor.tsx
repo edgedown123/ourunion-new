@@ -1095,8 +1095,8 @@ useEffect(() => {
 
   // ✅ 첨부 제한 (요청사항)
   // - 사진 5개 + 문서 3개 (총 8개)
-  // - 파일당 최대 5MB (선택 시점 체크)
-  // - 전체 합산 최대 15MB
+  // - 파일당 최대 30MB (선택 시점 체크)
+  // - 전체 합산 최대 30MB
   const MAX_TOTAL_FILES = 8;
   const MAX_IMAGE_FILES = 5;
   const MAX_DOC_FILES = 3;
