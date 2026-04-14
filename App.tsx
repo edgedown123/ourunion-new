@@ -191,7 +191,7 @@ const App: React.FC = () => {
       return;
     }
 
-    // 공고/공지, 경조사 글쓰기는 관리자만
+    // 공고/공지, 경조사만 관리자 글쓰기 제한
     if (['notice_all', 'family_events'].includes(targetType) && userRole !== 'admin') {
       setIsWriting(false);
       setWritingType(null);
@@ -1114,7 +1114,7 @@ await cloud.deleteMemberFromCloud(user.id);
   const handleWriteClick = (specificType?: BoardType) => {
     const rawType = specificType || activeTab;
     const targetType = (rawType === 'notice' ? 'notice_all' : rawType) as any;
-    // 공고/공지, 경조사는 관리자만 글쓰기 가능
+    // 공고/공지, 경조사만 관리자 글쓰기 가능
     if (['notice_all', 'family_events'].includes(targetType as string) && userRole !== 'admin') {
       setShowAdminLogin(true);
       return;

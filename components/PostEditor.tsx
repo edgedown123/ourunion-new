@@ -1100,8 +1100,8 @@ useEffect(() => {
   const MAX_TOTAL_FILES = 8;
   const MAX_IMAGE_FILES = 5;
   const MAX_DOC_FILES = 3;
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-  const MAX_TOTAL_SIZE = 15 * 1024 * 1024; // 15MB
+  const MAX_FILE_SIZE = 30 * 1024 * 1024; // 30MB
+  const MAX_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB
 
   // bytes -> human readable (e.g. 5MB)
   const formatFileSize = (bytes: number) => {
@@ -1605,19 +1605,19 @@ const isDocAttachment = (a: PostAttachment) => !isImageAttachment(a);
 
     const tooLarge = selected.find(f => f.size > MAX_FILE_SIZE);
     if (tooLarge) {
-      alert(`${tooLarge.name}: 파일 용량은 5MB 이하만 가능합니다.`);
+      alert(`${tooLarge.name}: 파일 용량은 30MB 이하만 가능합니다.`);
       return;
     }
 
     const selectedTotal = selected.reduce((sum, f) => sum + f.size, 0);
     const existingTotal = getExistingTotalBytes();
     if (existingTotal + selectedTotal > MAX_TOTAL_SIZE) {
-      alert(`첨부파일 총합은 최대 15MB까지만 가능합니다. (현재 약 ${formatFileSize(existingTotal)} + 선택 ${formatFileSize(selectedTotal)})`);
+      alert(`첨부파일 총합은 최대 30MB까지만 가능합니다. (현재 약 ${formatFileSize(existingTotal)} + 선택 ${formatFileSize(selectedTotal)})`);
       return;
     }
     const processFile = async (file: File) => {
       if (file.size > MAX_FILE_SIZE) {
-        alert(`${file.name}: 파일 용량은 5MB 이하만 가능합니다.`);
+        alert(`${file.name}: 파일 용량은 30MB 이하만 가능합니다.`);
         return;
       }
       const reader = new FileReader();
