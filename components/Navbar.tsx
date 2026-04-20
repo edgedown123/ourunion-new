@@ -44,7 +44,7 @@ const Navbar: React.FC<NavbarProps> = ({ siteName, activeTab, onTabChange, userR
     const intro = NAV_ITEMS.find(i => i.id === 'intro');
     const notice = NAV_ITEMS.find(i => i.id === 'notice');
     const dispatch = NAV_ITEMS.find(i => i.id === 'dispatch');
-    return [
+    const groups = [
       {
         id: 'intro',
         label: '조합소개',
@@ -76,7 +76,11 @@ const Navbar: React.FC<NavbarProps> = ({ siteName, activeTab, onTabChange, userR
       { id: 'resources', label: '정보/자료' },
       { id: 'admin', label: '설정' },
     ];
-  }, [])
+
+    return userRole === 'admin'
+      ? groups
+      : groups.filter(item => item.id !== 'dispatch');
+  }, [userRole])
 
 
 // 푸시 알림(조합원용)
@@ -112,13 +116,14 @@ const onDisableNoti = async () => {
   // 데스크톱: 공지사항(=공고/공지) / 경조사를 상단 메뉴로 분리
   const desktopNavItems = useMemo(() => {
     return NAV_ITEMS.flatMap((item) => {
+      if (item.id === 'dispatch' && userRole !== 'admin') return [];
       if (item.id !== 'notice') return [item];
       return [
         { ...item, id: 'notice_all', label: '공지사항' },
         { ...item, id: 'family_events', label: '경조사' },
       ];
     });
-  }, []);
+  }, [userRole]);
 ;
 
   const go = (tab: string) => {

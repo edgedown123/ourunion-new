@@ -529,6 +529,8 @@ const invalidateMembersCache = () => {
 };
 
 
+  const DISPATCH_TABS = ['dispatch', 'dispatch_jinkwan', 'dispatch_dobong', 'dispatch_songpa'];
+
   const handleTabChange = (tab: string) => {
     // 탭 그대로 이동
     // - 모바일: notice는 공지사항 랜딩(하위메뉴만 노출)
@@ -556,6 +558,11 @@ const invalidateMembersCache = () => {
       setShowApprovalPending(true);
       return;
     }
+
+    if (userRole !== 'admin' && DISPATCH_TABS.includes(nextTab)) {
+      alert('배차표는 관리자만 볼 수 있습니다.');
+      nextTab = 'home';
+    }
     
     setActiveTab(nextTab);
     setIsWriting(false);
@@ -565,6 +572,16 @@ const invalidateMembersCache = () => {
     pushNav({ tab: nextTab, postId: null, writing: false });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  useEffect(() => {
+    if (userRole !== 'admin' && DISPATCH_TABS.includes(activeTab)) {
+      setActiveTab('home');
+      setSelectedPostId(null);
+      setIsWriting(false);
+      setWritingType(null);
+      setEditingPost(null);
+    }
+  }, [userRole, activeTab]);
 
   const handleSavePost = async (title: string, content: string, attachments?: PostAttachment[], id?: string) => {
     let targetPost: Post;
