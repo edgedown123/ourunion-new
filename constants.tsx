@@ -109,6 +109,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
 
   { id: 'free', label: '자유게시판', icon: 'fa-comments' },
-  { id: 'resources', label: '자료실', icon: 'fa-folder-open' },
+  { id: 'questions', label: '아무거나 질문', icon: 'fa-circle-question' },
+  { id: 'resources', label: '정보/자료', icon: 'fa-folder-open' },
   { id: 'signup', label: '회원가입', icon: 'fa-user-plus' },
 ];

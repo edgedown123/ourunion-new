@@ -160,6 +160,7 @@ const App: React.FC = () => {
       'dispatch_dobong',
       'dispatch_songpa',
       'free',
+      'questions',
       'resources',
     ]);
     if (!guestRestricted.has(activeTab)) return;
@@ -547,6 +548,7 @@ const invalidateMembersCache = () => {
       'dispatch_dobong',
       'dispatch_songpa',
       'free',
+      'questions',
       'resources',
     ];
     
@@ -588,51 +590,43 @@ const invalidateMembersCache = () => {
         pinnedAt: null
       };
     }
+    // --------------------------------------
+    // ✅ 전 첨부파일(이미지/문서)을 Supabase Storage에 업로드하고 URL만 DB에 저장
+    // - 기존: 문서 파일은 data URL(base64) 그대로 DB에 들어갈 수 있어 일반회원 저장 시 실패 가능
+    // - 개선: data URL 첨부는 종류와 무관하게 모두 Storage로 올린 뒤 URL만 posts.attachments에 저장
+    // --------------------------------------
     try {
-      // --------------------------------------
-      // ✅ 첨부파일 저장 최적화
-      // - 일반 조합원(member)은 이미지/문서 모두 Storage(site-assets)에 업로드 후 URL만 게시글에 저장
-      // - 관리자는 기존 동작과의 호환을 위해 이미지 data URL만 Storage로 올리고 문서는 현재 방식 유지
-      // --------------------------------------
       if (cloud.isSupabaseEnabled() && targetPost.attachments?.length) {
         const nextAtt = await Promise.all(
           targetPost.attachments.map(async (a) => {
-            const isDataUrl = typeof a?.data === 'string' && a.data.startsWith('data:');
-            if (!isDataUrl) return a;
-
-            if (userRole === 'member') {
+            if (typeof a?.data === 'string' && a.data.startsWith('data:')) {
               return await cloud.uploadPostAttachment(targetPost.id, a);
             }
-
-            if (a?.type?.startsWith('image/')) {
-              return await cloud.uploadPostAttachment(targetPost.id, a);
-            }
-
             return a;
           })
         );
-
         targetPost = { ...targetPost, attachments: nextAtt, content: targetPost.content || '' };
       }
+    } catch (e) {
+      console.error('첨부파일 Storage 업로드 실패:', e);
+      alert('첨부파일 업로드에 실패했습니다. Supabase Storage 권한 또는 버킷 설정을 확인해주세요.');
+      return;
+    }
 
+    try {
       const newPosts = id ? posts.map(p => p.id === id ? targetPost : p) : [targetPost, ...posts];
+      await cloud.savePostToCloud(targetPost);
       setPosts(newPosts);
       saveToLocal('posts', newPosts);
-      await cloud.savePostToCloud(targetPost);
-
       alert('성공적으로 저장되었습니다.');
-      setIsWriting(false);
-      pushNav({ tab: activeTab, postId: null, writing: false });
-      setEditingPost(null);
-    } catch (e: any) {
+    } catch (e) {
       console.error('게시글 저장 실패:', e);
-      const msg = String(e?.message || e || '알 수 없는 오류');
-      if (/row-level security|not allowed|permission|403|401/i.test(msg)) {
-        alert('첨부파일 또는 게시글 저장 권한이 없어 등록에 실패했습니다. 제공한 SQL 정책 파일을 Supabase에 적용한 뒤 다시 시도해주세요.');
-      } else {
-        alert(`게시글 저장 중 오류가 발생했습니다.\n${msg}`);
-      }
+      alert('게시글 저장에 실패했습니다. posts 테이블 RLS 정책과 첨부파일 권한을 다시 확인해주세요.');
+      return;
     }
+    setIsWriting(false);
+    pushNav({ tab: activeTab, postId: null, writing: false });
+    setEditingPost(null);
   };
 
   const handleSaveComment = async (postId: string, content: string, parentId?: string) => {
@@ -1651,7 +1645,7 @@ await cloud.deleteMemberFromCloud(user.id);
               <h3 className="text-2xl font-black text-gray-900 mb-3">회원 탈퇴</h3>
               <p className="text-sm text-gray-500 font-medium leading-relaxed">
                 정말 탈퇴하시겠습니까?<br />
-                탈퇴하면 <span className="font-bold">자유게시판·자료실 이용 권한</span>이 종료됩니다.<br />
+                탈퇴하면 <span className="font-bold">자유게시판·아무거나 질문·정보/자료 이용 권한</span>이 종료됩니다.<br />
                 계속 진행하시려면 <span className="font-bold">이메일과 비밀번호</span>를 입력해 주세요.
               </p>
             </div>

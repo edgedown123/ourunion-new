@@ -384,10 +384,11 @@ const formatObituaryDateTime = (value: string | undefined) => {
   );
 
   // 모바일에서 일부 게시판 목록을 더 촘촘하게(행 높이/여백 축소)
-  // - 자유게시판/자료실
+  // - 자유게시판/아무거나 질문/정보·자료
   // - 공지사항 하위 탭(공고/공지, 경조사)
   const isCompactList =
     type === 'free' ||
+    type === 'questions' ||
     type === 'resources' ||
     type === 'notice_all' ||
     type === 'family_events' ||
@@ -1447,7 +1448,7 @@ const renderContentWithInlineImages = (raw?: unknown): { nodes: React.ReactNode[
           </h2>
           <p className="text-gray-400 font-bold text-xs mt-2 ml-1">우리노동조합 소통 공간</p>
         </div>
-        {userRole !== 'guest' && (userRole === 'admin' || type === 'free' || type === 'resources' || (typeof type === 'string' && type.startsWith('dispatch_'))) && type !== 'notice' && (
+        {userRole !== 'guest' && (userRole === 'admin' || type === 'free' || type === 'questions' || type === 'resources' || (typeof type === 'string' && type.startsWith('dispatch_'))) && type !== 'notice' && (
           <button 
             onClick={() => onWriteClick(type)} 
             className="bg-sky-primary text-white px-4 py-2 md:px-8 md:py-4 rounded-xl md:rounded-[1.5rem] font-black text-xs md:text-base shadow-xl shadow-sky-100 hover:opacity-90 active:scale-95 transition-all"

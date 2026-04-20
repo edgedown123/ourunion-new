@@ -72,7 +72,8 @@ const Navbar: React.FC<NavbarProps> = ({ siteName, activeTab, onTabChange, userR
         ]
       },
       { id: 'free', label: '자유게시판' },
-      { id: 'resources', label: '자료실' },
+      { id: 'questions', label: '아무거나 질문' },
+      { id: 'resources', label: '정보/자료' },
       { id: 'admin', label: '설정' },
     ];
   }, [])

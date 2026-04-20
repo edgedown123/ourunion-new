@@ -89,7 +89,8 @@ export default async function handler(req, res) {
       payload.body ||
       (board === "notice_all" ? "공고/공지에 새 글이 등록되었습니다."
         : board === "family_events" ? "경조사 게시판에 새 글이 등록되었습니다."
-        : board === "resources" ? "자료실에 새 자료가 업로드되었습니다."
+        : board === "questions" ? "아무거나 질문 게시판에 새 글이 등록되었습니다."
+        : board === "resources" ? "정보/자료 게시판에 새 자료가 업로드되었습니다."
         : isDispatch ? "배차표에 새 글이 등록되었습니다."
         : "자유게시판에 새 글이 등록되었습니다.");
 

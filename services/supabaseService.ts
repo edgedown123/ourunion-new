@@ -163,26 +163,45 @@ export const updatePostViewsInCloud = async (id: string, views: number) => {
 };
 
 export const savePostToCloud = async (post: Post) => {
-  if (!supabase) return;
+  if (!supabase) return post;
 
-  const { error } = await supabase.from('posts').upsert({
-      id: post.id,
-      type: post.type,
-      title: post.title,
-      content: post.content,
-      author: post.author,
-      created_at: post.createdAt,
-      views: post.views,
-      attachments: post.attachments,
-      password: post.password,
-      comments: post.comments,
-      pinned: post.pinned ?? false,
-      pinned_at: post.pinnedAt ?? null,
-    });
+  const payload = {
+    id: post.id,
+    type: post.type,
+    title: post.title,
+    content: post.content,
+    author: post.author,
+    created_at: post.createdAt,
+    views: post.views,
+    attachments: post.attachments,
+    password: post.password,
+    comments: post.comments,
+    pinned: post.pinned ?? false,
+    pinned_at: post.pinnedAt ?? null,
+  };
 
-  if (error) {
-    console.error('클라우드 게시글 저장 실패:', error);
-    throw error;
+  try {
+    // upsert는 RLS 환경에서 select/update 권한까지 엮여 예상치 못하게 막히는 경우가 있어
+    // 신규 글은 insert, 수정 글은 update로 분리해 저장합니다.
+    const { data: existing, error: existingError } = await supabase
+      .from('posts')
+      .select('id')
+      .eq('id', post.id)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+
+    const query = existing
+      ? supabase.from('posts').update(payload).eq('id', post.id)
+      : supabase.from('posts').insert(payload);
+
+    const { error } = await query;
+    if (error) throw error;
+
+    return post;
+  } catch (err) {
+    console.error('클라우드 게시글 저장 실패:', err);
+    throw err;
   }
 };
 
@@ -503,10 +522,9 @@ const dataUrlToFile = async (dataUrl: string, filename: string, mime: string): P
 };
 
 /**
- * 게시물 첨부를 Supabase Storage(site-assets)에 업로드하고 public URL을 반환합니다.
+ * 게시물 첨부(특히 사진)를 Supabase Storage(site-assets)에 업로드하고 public URL을 반환합니다.
  * - 기본 폴더: posts/<postId>/
- * - 이미지는 업로드 전에 리사이즈/압축 적용
- * - 문서/기타 파일은 원본 그대로 업로드
+ * - 업로드 전에 리사이즈/압축(resizeImageBeforeUpload) 적용
  */
 export const uploadPostAttachment = async (
   postId: string,
@@ -526,13 +544,13 @@ export const uploadPostAttachment = async (
 
   const rawFile = await dataUrlToFile(att.data, att.name || `file-${Date.now()}`, att.type);
 
-  const processedFile = rawFile.type?.startsWith('image/')
-    ? await resizeImageBeforeUpload(rawFile, {
-        maxWidth: 1600,
-        maxHeight: 1600,
-        jpegQuality: 0.75,
-      })
-    : rawFile;
+  // ✅ 업로드 전에 리사이즈/압축
+  const processedFile = await resizeImageBeforeUpload(rawFile, {
+    // 배차표(사진 위주) 최적화: 너무 큰 사진이면 줄임
+    maxWidth: 1600,
+    maxHeight: 1600,
+    jpegQuality: 0.75,
+  });
 
   const ext = processedFile.name.split('.').pop() || 'bin';
   const safeName = `${Date.now()}_${Math.random().toString(16).slice(2)}.${ext}`;

@@ -10,6 +10,7 @@ export type BoardType =
   | 'dispatch_dobong'
   | 'dispatch_songpa'
   | 'free'
+  | 'questions'
   | 'resources'
   | 'signup'
   | 'trash';

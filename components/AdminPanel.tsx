@@ -144,7 +144,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       case 'notice_all': return '공고/공지';
       case 'family_events': return '경조사';
       case 'free': return '자유게시판';
-      case 'resources': return '자료실';
+      case 'questions': return '아무거나 질문';
+      case 'resources': return '정보/자료';
       case 'intro': return '소개';
       case 'signup': return '가입';
       case 'trash': return '휴지통';
