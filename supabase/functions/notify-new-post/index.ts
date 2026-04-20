@@ -42,10 +42,11 @@ Deno.serve(async (req) => {
 
   // Supabase Database Webhook payload usually contains: record/new/old/table/schema
   const post = payload.record || payload.new || payload;
+  const board = post?.type || 'free';
   const url = buildUrlFromPost(post);
 
   const title = "우리노동조합";
-  const body = "새 게시글이 등록되었습니다.";
+  const body = board === "questions" ? "아무거나 질문 게시판에 새 글이 등록되었습니다." : board === "resources" ? "정보/자료 게시판에 새 글이 등록되었습니다." : board === "free" ? "자유게시판에 새 글이 등록되었습니다." : "새 게시글이 등록되었습니다.";
 
   // Load subscriptions
   const { data: subs, error } = await supabase

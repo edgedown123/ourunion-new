@@ -384,7 +384,7 @@ const formatObituaryDateTime = (value: string | undefined) => {
   );
 
   // 모바일에서 일부 게시판 목록을 더 촘촘하게(행 높이/여백 축소)
-  // - 자유게시판/아무거나 질문/정보·자료
+  // - 자유게시판/자료실
   // - 공지사항 하위 탭(공고/공지, 경조사)
   const isCompactList =
     type === 'free' ||

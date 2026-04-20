@@ -615,7 +615,11 @@ const invalidateMembersCache = () => {
 
     try {
       const newPosts = id ? posts.map(p => p.id === id ? targetPost : p) : [targetPost, ...posts];
-      await cloud.savePostToCloud(targetPost);
+      if (userRole === 'admin') {
+        await cloud.savePostAsAdmin(targetPost, '1229');
+      } else {
+        await cloud.savePostToCloud(targetPost);
+      }
       setPosts(newPosts);
       saveToLocal('posts', newPosts);
       alert('성공적으로 저장되었습니다.');
@@ -656,7 +660,15 @@ const invalidateMembersCache = () => {
             ) 
           };
         }
+        if (userRole === 'admin') {
+          cloud.savePostAsAdmin(updatedPost, '1229');
+        } else {
+          if (userRole === 'admin') {
+        cloud.savePostAsAdmin(updatedPost, '1229');
+      } else {
         cloud.savePostToCloud(updatedPost);
+      }
+        }
         return updatedPost;
       }
       return post;
@@ -687,7 +699,11 @@ const invalidateMembersCache = () => {
       });
 
       const updatedPost = { ...post, comments: updatedComments };
-      cloud.savePostToCloud(updatedPost);
+      if (userRole === 'admin') {
+        cloud.savePostAsAdmin(updatedPost, '1229');
+      } else {
+        cloud.savePostToCloud(updatedPost);
+      }
       return updatedPost;
     });
 
@@ -716,7 +732,11 @@ const invalidateMembersCache = () => {
       }
 
       const updatedPost = { ...post, comments: updatedComments };
-      cloud.savePostToCloud(updatedPost);
+      if (userRole === 'admin') {
+        cloud.savePostAsAdmin(updatedPost, '1229');
+      } else {
+        cloud.savePostToCloud(updatedPost);
+      }
       return updatedPost;
     });
 
@@ -744,7 +764,11 @@ const invalidateMembersCache = () => {
     setPosts(updatedPosts);
     setDeletedPosts([postToDelete, ...deletedPosts]);
     saveToLocal('posts', updatedPosts);
-    await cloud.deletePostFromCloud(postId);
+    if (userRole === 'admin') {
+      await cloud.deletePostAsAdmin(postId, '1229');
+    } else {
+      await cloud.deletePostFromCloud(postId);
+    }
     
     setSelectedPostId(null);
     pushNav({ tab: activeTab, postId: null, writing: false });
@@ -890,10 +914,19 @@ await cloud.deleteMemberFromCloud(memberId);
 
   const handleAdminLogin = async () => {
     if (adminPassword === '1229') {
+      try {
+        // 일반 조합원 세션이 남아 있으면 먼저 정리
+        await cloud.signOut();
+      } catch (e) {
+        console.warn('기존 세션 정리 실패(무시):', e);
+      }
+
       setIsAdminAuth(true);
       setUserRole('admin');
+      setLoggedInMember(null);
       localStorage.setItem('union_role', 'admin');
       localStorage.setItem('union_is_admin', 'true');
+      localStorage.removeItem('union_member');
       setShowAdminLogin(false);
       setAdminPassword('');
       alert('관리자 모드로 접속되었습니다.');

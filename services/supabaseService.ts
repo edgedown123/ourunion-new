@@ -206,6 +206,34 @@ export const savePostToCloud = async (post: Post) => {
 };
 
 
+
+const callAdminPostsApi = async (payload: Record<string, any>) => {
+  const res = await fetch('/api/admin-posts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  let data: any = null;
+  try {
+    data = await res.json();
+  } catch {}
+
+  if (!res.ok || data?.ok === false) {
+    throw new Error(data?.error || '관리자 게시글 처리 중 오류가 발생했습니다.');
+  }
+
+  return data;
+};
+
+export const savePostAsAdmin = async (post: Post, adminPin: string) => {
+  return await callAdminPostsApi({ action: 'save', adminPin, post });
+};
+
+export const deletePostAsAdmin = async (postId: string, adminPin: string) => {
+  return await callAdminPostsApi({ action: 'delete', adminPin, postId });
+};
+
 export const setPostPinnedInCloud = async (id: string, pinned: boolean) => {
   if (!supabase) return;
   try {
